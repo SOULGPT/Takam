@@ -10,7 +10,10 @@ import {
   Platform,
   ActivityIndicator,
   Animated,
+  Modal,
+  Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
@@ -24,6 +27,8 @@ type Message = {
   content: string;
   created_at: string;
   is_system?: boolean;
+  reply_to_id?: string;
+  is_pinned?: boolean;
 };
 
 export default function ChatScreen() {
@@ -34,6 +39,59 @@ export default function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  
+  // Context Menu State
+  const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(300)).current;
+
+  const openContextMenu = (msg: Message) => {
+    setContextMenuMsg(msg);
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true })
+    ]).start();
+  };
+
+  const closeContextMenu = () => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
+      Animated.timing(slideAnim, { toValue: 300, duration: 150, useNativeDriver: true })
+    ]).start(() => setContextMenuMsg(null));
+  };
+
+  const handleActionCopy = async () => {
+    if (contextMenuMsg) await Clipboard.setStringAsync(contextMenuMsg.content);
+    closeContextMenu();
+  };
+
+  const handleActionReply = () => {
+    setReplyTarget(contextMenuMsg);
+    closeContextMenu();
+  };
+
+  const handleActionPin = async () => {
+    if (!contextMenuMsg || !activeBondId) return;
+    const toggled = !contextMenuMsg.is_pinned;
+    
+    // Update local UI optimistic
+    setMessages(prev => prev.map(m => {
+      if (m.id === contextMenuMsg.id) return { ...m, is_pinned: toggled };
+      if (toggled && m.is_pinned) return { ...m, is_pinned: false };
+      return m;
+    }));
+    
+    await supabase.from('messages').update({ is_pinned: false }).eq('bond_id', activeBondId); 
+    if (toggled) {
+      await supabase.from('messages').update({ is_pinned: true }).eq('id', contextMenuMsg.id);
+    }
+    closeContextMenu();
+  };
+
+  const handleActionReport = () => {
+    Alert.alert('Reported', 'This message has been flagged for review by Takam.', [{ text: 'OK', onPress: closeContextMenu }]);
+  };
 
   const activeBond = bonds.find((b) => b.id === activeBondId);
   const partnerProfile = activeBondId ? bondMembers[activeBondId] : null;
@@ -139,8 +197,10 @@ export default function ChatScreen() {
       sender_id: session.user.id,
       content: txt,
       created_at: new Date().toISOString(),
+      reply_to_id: replyTarget?.id,
     };
     setMessages((prev) => [newMsg, ...prev]);
+    setReplyTarget(null);
 
     try {
       const { data, error } = await supabase
@@ -149,6 +209,7 @@ export default function ChatScreen() {
           bond_id: activeBondId,
           sender_id: session.user.id,
           content: txt,
+          reply_to_id: replyTarget?.id || null,
         })
         .select()
         .single();
@@ -195,6 +256,8 @@ export default function ChatScreen() {
     }
 
     const isMe = item.sender_id === session?.user?.id;
+    const parentMsg = item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) : null;
+
     return (
       <View style={[styles.bubbleWrap, isMe ? styles.bubbleMeWrap : styles.bubbleThemWrap]}>
         {!isMe && (
@@ -202,15 +265,28 @@ export default function ChatScreen() {
             <Text style={styles.avatarSmallText}>{partnerInitial}</Text>
           </View>
         )}
-        <View style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}>
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          delayLongPress={250}
+          onLongPress={() => openContextMenu(item)}
+          style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+        >
+          {parentMsg && (
+            <View style={styles.bubbleReplyInner}>
+              <Text style={styles.bubbleReplyName}>{parentMsg.sender_id === session?.user?.id ? 'You' : partnerName}</Text>
+              <Text style={styles.bubbleReplyText} numberOfLines={1}>{parentMsg.content}</Text>
+            </View>
+          )}
           <Text style={[styles.bubbleText, isMe && styles.bubbleMeText]}>{item.content}</Text>
           <Text style={[styles.bubbleTime, isMe && styles.bubbleMeTime]}>
             {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   };
+
+  const pinnedMessage = messages.find(m => m.is_pinned);
 
   return (
     <KeyboardAvoidingView
@@ -241,6 +317,17 @@ export default function ChatScreen() {
         </View>
       </View>
 
+      {/* Pinned Message */}
+      {pinnedMessage && (
+        <View style={styles.pinnedBanner}>
+          <Text style={styles.pinnedIcon}>📌</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.pinnedLabel}>Pinned Message</Text>
+            <Text style={styles.pinnedText} numberOfLines={1}>{pinnedMessage.content}</Text>
+          </View>
+        </View>
+      )}
+
       {/* Messages List */}
       {loading ? (
         <View style={styles.center}>
@@ -257,31 +344,83 @@ export default function ChatScreen() {
         />
       )}
 
-      {/* Input Area */}
-      <View style={styles.inputArea}>
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Message..."
-          placeholderTextColor="#C5A870"
-          multiline
-          maxLength={1000}
-        />
-        <TouchableOpacity
-          style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!inputText.trim() || sending}
-        >
-          <LinearGradient
-            colors={inputText.trim() ? ['#D97B60', '#C9705A'] : ['#D9BC8A', '#C5A870']}
-            style={styles.sendBtnGrad}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
+      {/* Context Menu Modal */}
+      <Modal visible={!!contextMenuMsg} transparent animationType="fade" onRequestClose={closeContextMenu}>
+        <View style={StyleSheet.absoluteFill}>
+          <Animated.View style={[styles.contextBackdrop, { opacity: fadeAnim }]}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeContextMenu} activeOpacity={1} />
+          </Animated.View>
+          
+          <Animated.View style={[styles.contextMenu, { transform: [{ translateY: slideAnim }] }]}>
+             <Text style={styles.contextHeader}>Message Options</Text>
+             <Text style={styles.contextSnippet} numberOfLines={2}>{contextMenuMsg?.content}</Text>
+             
+             <View style={styles.contextButtonGroup}>
+                <TouchableOpacity style={styles.contextButton} onPress={handleActionReply}>
+                  <Text style={styles.contextButtonText}>↩️ Reply</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.contextButton} onPress={handleActionCopy}>
+                  <Text style={styles.contextButtonText}>📋 Copy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.contextButton} onPress={handleActionPin}>
+                  <Text style={styles.contextButtonText}>{contextMenuMsg?.is_pinned ? '📌 Unpin' : '📌 Pin to Top'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.contextButton, { borderBottomWidth: 0 }]} onPress={handleActionReport}>
+                  <Text style={[styles.contextButtonText, { color: '#D32F2F' }]}>⚠️ Report</Text>
+                </TouchableOpacity>
+             </View>
+             
+             <TouchableOpacity style={styles.contextCancelBtn} onPress={closeContextMenu}>
+               <Text style={styles.contextCancelText}>Cancel</Text>
+             </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Input Area Group */}
+      <View style={styles.inputAreaWrapper}>
+        {replyTarget && (
+          <View style={styles.replyBanner}>
+            <View style={styles.replyBannerContent}>
+              <Text style={styles.replyBannerLabel}>Replying to {replyTarget.sender_id === session?.user?.id ? 'yourself' : partnerName}</Text>
+              <Text style={styles.replyBannerSnippet} numberOfLines={1}>{replyTarget.content}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setReplyTarget(null)} style={styles.replyBannerClose}>
+              <Text style={styles.replyBannerCloseText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <View style={styles.inputArea}>
+          <TextInput
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Message..."
+            placeholderTextColor="#C5A870"
+            multiline
+            maxLength={1000}
+            onKeyPress={(e) => {
+              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter') {
+                // @ts-ignore
+                if (!e.nativeEvent.shiftKey) { e.preventDefault(); handleSend(); }
+              }
+            }}
+          />
+          <TouchableOpacity
+            style={[styles.sendBtn, (!inputText.trim() || sending) && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!inputText.trim() || sending}
           >
-            <Text style={styles.sendIcon}>↑</Text>
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={inputText.trim() ? ['#D97B60', '#C9705A'] : ['#D9BC8A', '#C5A870']}
+              style={styles.sendBtnGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              <Text style={styles.sendIcon}>↑</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
