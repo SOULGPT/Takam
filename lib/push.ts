@@ -6,12 +6,12 @@ import { supabase } from './supabase';
 
 // Fixed the handler to include missing properties required by the latest Expo SDK
 Notifications.setNotificationHandler({
-  handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
+  handleNotification: async (notification: Notifications.Notification): Promise<Notifications.NotificationBehavior> => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
-    shouldShowBanner: true, // Added to fix TS2739
-    shouldShowList: true,   // Added to fix TS2739
+    shouldShowBanner: true,
+    shouldShowList: true,
   }),
 });
 
