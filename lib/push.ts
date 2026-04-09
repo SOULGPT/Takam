@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
+  handleNotification: async (notification) => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
