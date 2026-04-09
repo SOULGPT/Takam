@@ -4,16 +4,19 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
+// Fixed the handler to include missing properties required by the latest Expo SDK
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => ({
+  handleNotification: async (): Promise<Notifications.NotificationBehavior> => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
+    shouldShowBanner: true, // Added to fix TS2739
+    shouldShowList: true,   // Added to fix TS2739
   }),
 });
 
 export async function registerForPushNotificationsAsync(userId: string) {
-  let token;
+  let token: string | undefined;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -27,10 +30,12 @@ export async function registerForPushNotificationsAsync(userId: string) {
   if (Device.isDevice) {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
+
     if (finalStatus !== 'granted') {
       console.log('Permission not granted to get push token!');
       return;
@@ -38,12 +43,11 @@ export async function registerForPushNotificationsAsync(userId: string) {
 
     try {
       const projectId =
-        Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId;
+
       if (!projectId) {
-        console.log('Project ID not found. Ensure EAS build is configured.');
-        // We fallback to just the legacy getExpoPushTokenAsync args if needed, 
-        // but Expo SDK 50+ usually requires explicitly passing the projectId.
+        throw new Error('Project ID not found. Ensure app.json has an eas.projectId.');
       }
 
       token = (
@@ -54,10 +58,14 @@ export async function registerForPushNotificationsAsync(userId: string) {
 
       if (token) {
         console.log('Got Expo Push Token:', token);
-        await supabase
+        const { error } = await supabase
           .from('profiles')
           .update({ expo_push_token: token })
           .eq('id', userId);
+
+        if (error) {
+          console.error('Error updating Supabase with token:', error.message);
+        }
       }
     } catch (e) {
       console.log('Error getting push token:', e);
