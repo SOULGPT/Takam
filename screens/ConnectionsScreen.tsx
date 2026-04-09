@@ -1,0 +1,865 @@
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  StatusBar,
+  Platform,
+  TextInput,
+  Animated,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../lib/supabase';
+import { useStore, Bond, BOND_META, BondType } from '../store/useStore';
+
+// ── All 10 relationship types ─────────────────────────────────────────────────
+const ALL_BOND_TYPES: BondType[] = [
+  'partner','spouse','bestfriend','friend','sibling',
+  'parent','child','family','colleague','other',
+];
+
+function generateBondCode(): string {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// ── Initials helper ───────────────────────────────────────────────────────────
+function initials(name: string): string {
+  return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
+}
+
+// ── Bond card ─────────────────────────────────────────────────────────────────
+function BondCard({
+  bond,
+  myId,
+  onSetActive,
+  onRemove,
+  isActive,
+}: {
+  bond: Bond;
+  myId: string;
+  onSetActive: () => void;
+  onRemove: () => void;
+  isActive: boolean;
+}) {
+  const { bondMembers } = useStore();
+  const partner = bondMembers[bond.id];
+  const meta = BOND_META[bond.bond_type] ?? BOND_META.other;
+  const partnerName = partner?.display_name ?? partner?.username ?? '—';
+  const isPending = bond.status === 'pending';
+  const isMine = bond.user_a === myId;
+
+  const copyCode = () => {
+    if (Platform.OS === 'web') {
+      navigator.clipboard?.writeText(bond.bond_code)
+        .then(() => Alert.alert('Copied!', 'Bond code copied.'))
+        .catch(() => Alert.alert('Your code', bond.bond_code));
+    } else {
+      Alert.alert('Bond Code', bond.bond_code);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      style={[styles.bondCard, isActive && styles.bondCardActive]}
+      onPress={isPending ? undefined : onSetActive}
+      activeOpacity={isPending ? 1 : 0.85}
+    >
+      {/* Active indicator stripe */}
+      {isActive && <View style={[styles.activeStripe, { backgroundColor: meta.color }]} />}
+
+      <View style={styles.cardRow}>
+        {/* Avatar */}
+        <View style={[styles.avatar, { backgroundColor: meta.color }]}>
+          <Text style={styles.avatarText}>
+            {isPending ? '?' : initials(partnerName || '?')}
+          </Text>
+        </View>
+
+        {/* Info */}
+        <View style={styles.cardInfo}>
+          <View style={styles.cardNameRow}>
+            <Text style={styles.cardName} numberOfLines={1}>
+              {isPending ? (isMine ? 'Waiting for reply…' : 'Being connected…') : partnerName}
+            </Text>
+            {isActive && !isPending && (
+              <View style={[styles.activeBadge, { backgroundColor: meta.color + '22', borderColor: meta.color }]}>
+                <Text style={[styles.activeBadgeText, { color: meta.color }]}>Active</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.typeBadgeRow}>
+            <Text style={styles.typeEmoji}>{meta.emoji}</Text>
+            <Text style={styles.typeLabel}>{meta.label}</Text>
+            {isPending && (
+              <View style={styles.pendingPill}>
+                <Text style={styles.pendingPillText}>Pending</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Pending: show code + copy */}
+          {isPending && isMine && (
+            <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.75}>
+              <Text style={styles.codeText}>{bond.bond_code}</Text>
+              <Text style={styles.copyLabel}>📋 Copy</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Actions menu */}
+        <TouchableOpacity
+          style={styles.menuBtn}
+          onPress={() => {
+            const options: any[] = [];
+            if (!isPending) {
+              options.push({ text: '✦ Set as Active', onPress: onSetActive });
+            }
+            options.push({
+              text: isPending ? 'Cancel & Delete' : 'Remove Connection',
+              style: 'destructive',
+              onPress: onRemove,
+            });
+            options.push({ text: 'Cancel', style: 'cancel' });
+            Alert.alert(
+              isPending ? 'Pending Bond' : partnerName,
+              isPending ? 'What would you like to do?' : `Manage your ${meta.label} bond`,
+              options,
+            );
+          }}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.menuDots}>•••</Text>
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <View style={styles.emptyWrap}>
+      <Text style={styles.emptyEmoji}>💞</Text>
+      <Text style={styles.emptyTitle}>No connections yet</Text>
+      <Text style={styles.emptySub}>
+        Add a partner, friend, sibling, or anyone special{'\n'}and start sharing vibes with them.
+      </Text>
+      <TouchableOpacity style={styles.emptyBtn} onPress={onAdd} activeOpacity={0.85}>
+        <LinearGradient
+          colors={['#D97B60', '#C9705A', '#A8503E']}
+          style={styles.emptyBtnGrad}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+        >
+          <Text style={styles.emptyBtnText}>Add Your First Connection</Text>
+        </LinearGradient>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+// ── Bond type picker (for create flow) ───────────────────────────────────────
+function TypePicker({
+  selected,
+  onSelect,
+}: {
+  selected: BondType;
+  onSelect: (t: BondType) => void;
+}) {
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 380 }}>
+      <View style={styles.typeGrid}>
+        {ALL_BOND_TYPES.map((t) => {
+          const m = BOND_META[t];
+          const active = selected === t;
+          return (
+            <TouchableOpacity
+              key={t}
+              style={[
+                styles.typeChip,
+                active && { borderColor: m.color, backgroundColor: m.color + '18' },
+              ]}
+              onPress={() => onSelect(t)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.typeChipEmoji}>{m.emoji}</Text>
+              <Text style={[styles.typeChipLabel, active && { color: m.color, fontWeight: '700' }]}>
+                {m.label}
+              </Text>
+              {active && <View style={[styles.typeChipDot, { backgroundColor: m.color }]} />}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ── Main ConnectionsScreen ────────────────────────────────────────────────────
+type Mode = 'list' | 'typeSelect' | 'create' | 'join' | 'waiting';
+
+export default function ConnectionsScreen() {
+  const nav = useNavigation<any>();
+  const {
+    session,
+    bonds,
+    bondMembers,
+    activeBondId,
+    setActiveBondId,
+    addBond,
+    updateBond,
+    removeBond,
+  } = useStore();
+
+  // ── Local state for Add Connection flow ──────────────────────────────────
+  const [mode, setMode] = useState<Mode>('list');
+  const [selectedType, setSelectedType] = useState<BondType>('partner');
+  const [joinCode, setJoinCode] = useState('');
+  const [pendingBond, setPendingBond] = useState<Bond | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // ── Create bond ───────────────────────────────────────────────────────────
+  const handleCreate = async () => {
+    if (!session?.user) return;
+    setLoading(true);
+    try {
+      const bondCode = generateBondCode();
+      const { data, error } = await supabase
+        .from('bonds')
+        .insert({
+          user_a: session.user.id,
+          bond_code: bondCode,
+          bond_type: selectedType,
+          status: 'pending',
+        })
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        addBond(data as Bond);
+        setPendingBond(data as Bond);
+        setMode('waiting');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Join bond ─────────────────────────────────────────────────────────────
+  const handleJoin = async () => {
+    if (!session?.user || joinCode.length !== 6) return;
+    setLoading(true);
+    try {
+      const { data: found, error: findErr } = await supabase
+        .from('bonds')
+        .select()
+        .eq('bond_code', joinCode.toUpperCase())
+        .eq('status', 'pending')
+        .maybeSingle();
+
+      if (findErr) throw new Error(findErr.message);
+      if (!found) throw new Error('Bond code not found or already used.');
+      if (found.user_a === session.user.id) throw new Error("That's your own code!");
+
+      const { data: updated, error: joinErr } = await supabase
+        .from('bonds')
+        .update({ user_b: session.user.id, status: 'active' })
+        .eq('id', found.id)
+        .select()
+        .maybeSingle();
+
+      if (joinErr) throw new Error(joinErr.message);
+      if (!updated) throw new Error('Could not activate bond. Please try again.');
+
+      addBond(updated as Bond);
+      // Fetch partner profile
+      const { data: partnerProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', found.user_a)
+        .single();
+      if (partnerProfile) {
+        useStore.getState().setBondMember(updated.id, partnerProfile);
+      }
+      if (!activeBondId) setActiveBondId(updated.id);
+
+      setJoinCode('');
+      setMode('list');
+      Alert.alert('Connected! 💞', `You are now bonded as ${BOND_META[updated.bond_type as BondType]?.label}.`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Remove bond ───────────────────────────────────────────────────────────
+  const handleRemove = (bond: Bond) => {
+    const meta = BOND_META[bond.bond_type] ?? BOND_META.other;
+    const partner = bondMembers[bond.id];
+    const partnerName = partner?.display_name ?? 'this connection';
+    Alert.alert(
+      'Remove Connection',
+      `Remove your ${meta.label} bond with ${partnerName}? This cannot be undone.`,
+      [
+        { text: 'Keep', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            await supabase.from('bonds').delete().eq('id', bond.id);
+            removeBond(bond.id);
+          },
+        },
+      ],
+    );
+  };
+
+  // ── Set active + navigate home ────────────────────────────────────────────
+  const handleSetActive = (bondId: string) => {
+    setActiveBondId(bondId);
+    nav.navigate?.('Home');
+  };
+
+  // ── Copy code helper for waiting screen ──────────────────────────────────
+  const copyCode = (code: string) => {
+    if (Platform.OS === 'web') {
+      navigator.clipboard?.writeText(code)
+        .then(() => Alert.alert('Copied!', 'Bond code copied.'))
+        .catch(() => Alert.alert('Your Code', code));
+    } else {
+      Alert.alert('Bond Code', code);
+    }
+  };
+
+  const myId = session?.user?.id ?? '';
+  const activeBonds = bonds.filter((b) => b.status === 'active');
+  const pendingBonds = bonds.filter((b) => b.status === 'pending');
+
+  // ── RENDER: List ─────────────────────────────────────────────────────────
+  if (mode === 'list') {
+    return (
+      <View style={styles.root}>
+        <StatusBar barStyle="dark-content" />
+        <LinearGradient
+          colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']}
+          style={StyleSheet.absoluteFill}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+        <View style={[styles.blobDeco, styles.blobTR]} />
+
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerTextWrap}>
+            <Text style={styles.headerTitle}>Connections</Text>
+            {bonds.length > 0 && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{bonds.length}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.headerSub}>
+            {bonds.length === 0
+              ? 'Add people you care about'
+              : `${activeBonds.length} active · ${pendingBonds.length} pending`}
+          </Text>
+        </View>
+
+        {bonds.length === 0 ? (
+          <EmptyState onAdd={() => setMode('typeSelect')} />
+        ) : (
+          <FlatList
+            data={bonds}
+            keyExtractor={(b) => b.id}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            renderItem={({ item }) => (
+              <BondCard
+                bond={item}
+                myId={myId}
+                isActive={item.id === activeBondId}
+                onSetActive={() => handleSetActive(item.id)}
+                onRemove={() => handleRemove(item)}
+              />
+            )}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+          />
+        )}
+
+        {/* FAB */}
+        {bonds.length > 0 && (
+          <TouchableOpacity
+            style={styles.fab}
+            onPress={() => setMode('typeSelect')}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={['#D97B60', '#C9705A']}
+              style={styles.fabGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Text style={styles.fabText}>+ Add</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+
+  // ── RENDER: Choose create or join ────────────────────────────────────────
+  if (mode === 'typeSelect') {
+    const meta = BOND_META[selectedType];
+    return (
+      <View style={styles.root}>
+        <StatusBar barStyle="dark-content" />
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+
+        <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
+          <TouchableOpacity onPress={() => setMode('list')} style={styles.backRow}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.flowTitle}>Choose relationship</Text>
+          <Text style={styles.flowSub}>How are you connected to this person?</Text>
+
+          <TypePicker selected={selectedType} onSelect={setSelectedType} />
+
+          <View style={styles.actionChoice}>
+            <TouchableOpacity
+              style={styles.createBtn}
+              onPress={() => setMode('create')}
+              activeOpacity={0.87}
+            >
+              <LinearGradient
+                colors={[meta.color + 'CC', meta.color]}
+                style={styles.createBtnGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.createBtnText}>{meta.emoji}  Generate Bond Code</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.joinBtn}
+              onPress={() => setMode('join')}
+              activeOpacity={0.87}
+            >
+              <Text style={styles.joinBtnText}>🔗  I have a code to enter</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
+  // ── RENDER: Create (confirm + generate) ──────────────────────────────────
+  if (mode === 'create') {
+    const meta = BOND_META[selectedType];
+    return (
+      <View style={styles.root}>
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+        <View style={styles.flowContent}>
+          <TouchableOpacity onPress={() => setMode('typeSelect')} style={styles.backRow}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.flowTitle}>{meta.emoji}  {meta.label} Bond</Text>
+          <Text style={styles.flowSub}>
+            Tap below to generate your unique bond code and share it.
+          </Text>
+          <View style={styles.createCard}>
+            <TouchableOpacity
+              style={styles.generateBtn}
+              onPress={handleCreate}
+              disabled={loading}
+              activeOpacity={0.85}
+            >
+              <LinearGradient
+                colors={['#D97B60', '#C9705A', '#A8503E']}
+                style={styles.generateBtnGrad}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FDFAF4" />
+                ) : (
+                  <Text style={styles.generateBtnText}>Generate Code ✦</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  // ── RENDER: Waiting for partner ──────────────────────────────────────────
+  if (mode === 'waiting' && pendingBond) {
+    const meta = BOND_META[pendingBond.bond_type] ?? BOND_META.other;
+    return (
+      <View style={styles.root}>
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+        <View style={styles.flowContent}>
+          <Text style={styles.flowTitle}>Share Your Code 🔗</Text>
+          <Text style={styles.flowSub}>
+            Send this to your {meta.label.toLowerCase()} — they enter it to connect with you.
+          </Text>
+
+          <View style={styles.waitCard}>
+            <Text style={styles.waitType}>{meta.emoji}  {meta.label} Bond</Text>
+            <Text style={styles.waitCodeLabel}>YOUR BOND CODE</Text>
+            <Text style={styles.waitCode}>{pendingBond.bond_code}</Text>
+            <TouchableOpacity
+              style={styles.copyBtn}
+              onPress={() => copyCode(pendingBond.bond_code)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.copyBtnText}>📋  Copy Code</Text>
+            </TouchableOpacity>
+            <Text style={styles.waitNote}>⏳ Waiting for them to join…</Text>
+          </View>
+
+          <TouchableOpacity onPress={() => { setPendingBond(null); setMode('list'); }}>
+            <Text style={[styles.backText, { textAlign: 'center', marginTop: 8 }]}>
+              Done — go back to connections
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // ── RENDER: Join ─────────────────────────────────────────────────────────
+  return (
+    <View style={styles.root}>
+      <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+      <View style={styles.flowContent}>
+        <TouchableOpacity onPress={() => setMode('typeSelect')} style={styles.backRow}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.flowTitle}>Join a Bond 🔗</Text>
+        <Text style={styles.flowSub}>Enter the 6-character code you received.</Text>
+
+        <View style={styles.joinCard}>
+          <TextInput
+            style={styles.codeInput}
+            value={joinCode}
+            onChangeText={(t) => setJoinCode(t.toUpperCase())}
+            maxLength={6}
+            autoCapitalize="characters"
+            placeholder="ABC123"
+            placeholderTextColor="#B5947A"
+          />
+          <TouchableOpacity
+            style={[styles.generateBtn, joinCode.length !== 6 && styles.generateBtnDisabled]}
+            onPress={handleJoin}
+            disabled={loading || joinCode.length !== 6}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={joinCode.length === 6 ? ['#D97B60', '#C9705A', '#A8503E'] : ['#D9BC8A', '#C5A870']}
+              style={styles.generateBtnGrad}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FDFAF4" />
+              ) : (
+                <Text style={styles.generateBtnText}>Connect ✦</Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Styles ───────────────────────────────────────────────────────────────────
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#F5ECD7' },
+
+  blobDeco: { position: 'absolute', borderRadius: 999, opacity: 0.1, backgroundColor: '#C9705A' },
+  blobTR: { width: 220, height: 220, top: -60, right: -60 },
+
+  // ── Header ──
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    gap: 4,
+  },
+  headerTextWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerTitle: { fontSize: 30, fontWeight: '800', color: '#3D2B1F', letterSpacing: 0.3 },
+  headerSub: { fontSize: 14, color: '#8C6246' },
+  countBadge: {
+    backgroundColor: '#C9705A',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    minWidth: 24,
+    alignItems: 'center',
+  },
+  countBadgeText: { fontSize: 13, fontWeight: '800', color: '#FDFAF4' },
+
+  // ── Bond cards ──
+  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  bondCard: {
+    backgroundColor: '#FDFAF4',
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    overflow: 'hidden',
+    shadowColor: '#3D2B1F',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  bondCardActive: {
+    borderColor: '#C9705A',
+    shadowOpacity: 0.13,
+    elevation: 5,
+  },
+  activeStripe: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingLeft: 20,
+    gap: 14,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexShrink: 0,
+  },
+  avatarText: { fontSize: 18, fontWeight: '800', color: '#FDFAF4' },
+  cardInfo: { flex: 1, gap: 4 },
+  cardNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardName: { fontSize: 16, fontWeight: '700', color: '#3D2B1F', flex: 1 },
+  activeBadge: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  activeBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
+  typeBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  typeEmoji: { fontSize: 13 },
+  typeLabel: { fontSize: 12, color: '#8C6246', fontWeight: '500' },
+  pendingPill: {
+    backgroundColor: '#F0DC8A',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    marginLeft: 4,
+  },
+  pendingPillText: { fontSize: 10, fontWeight: '700', color: '#6B5800' },
+  codeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 4,
+    backgroundColor: '#F5ECD7',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'flex-start',
+  },
+  codeText: { fontSize: 16, fontWeight: '900', color: '#3D2B1F', letterSpacing: 4 },
+  copyLabel: { fontSize: 12, color: '#8C6246', fontWeight: '600' },
+  menuBtn: { paddingLeft: 6 },
+  menuDots: { fontSize: 16, color: '#B5947A', fontWeight: '700', letterSpacing: -1 },
+
+  // ── Empty state ──
+  emptyWrap: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 14,
+    marginTop: -40,
+  },
+  emptyEmoji: { fontSize: 64 },
+  emptyTitle: { fontSize: 22, fontWeight: '800', color: '#3D2B1F', textAlign: 'center' },
+  emptySub: { fontSize: 14, color: '#8C6246', textAlign: 'center', lineHeight: 21 },
+  emptyBtn: {
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginTop: 8,
+    shadowColor: '#9B3D2C',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.28,
+    shadowRadius: 12,
+    elevation: 7,
+  },
+  emptyBtnGrad: { paddingVertical: 16, paddingHorizontal: 28, alignItems: 'center' },
+  emptyBtnText: { fontSize: 15, fontWeight: '800', color: '#FDFAF4' },
+
+  // ── FAB ──
+  fab: {
+    position: 'absolute',
+    bottom: 28,
+    right: 20,
+    borderRadius: 28,
+    overflow: 'hidden',
+    shadowColor: '#9B3D2C',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 9,
+  },
+  fabGrad: { paddingVertical: 14, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center' },
+  fabText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.2 },
+
+  // ── Flow screens ──
+  flowContent: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 64,
+    gap: 18,
+  },
+  backRow: { marginBottom: 4 },
+  backText: { fontSize: 15, color: '#8C6246', fontWeight: '600' },
+  flowTitle: { fontSize: 28, fontWeight: '800', color: '#3D2B1F', letterSpacing: 0.2 },
+  flowSub: { fontSize: 14, color: '#8C6246', lineHeight: 21, marginBottom: 4 },
+
+  // ── Type grid ──
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    paddingVertical: 4,
+  },
+  typeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    backgroundColor: '#FDFAF4',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    width: '47%',
+  },
+  typeChipEmoji: { fontSize: 18 },
+  typeChipLabel: { fontSize: 13, fontWeight: '500', color: '#5C3D2E', flex: 1 },
+  typeChipDot: { width: 8, height: 8, borderRadius: 4 },
+
+  // ── Action choice ──
+  actionChoice: { gap: 12, marginTop: 4 },
+  createBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#9B3D2C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  createBtnGrad: { paddingVertical: 17, alignItems: 'center' },
+  createBtnText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.3 },
+  joinBtn: {
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#C9705A',
+    paddingVertical: 17,
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  joinBtnText: { fontSize: 15, fontWeight: '600', color: '#C9705A' },
+
+  // ── Create / waiting cards ──
+  createCard: {
+    backgroundColor: '#FDFAF4',
+    borderRadius: 22,
+    padding: 24,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+  },
+  generateBtn: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#9B3D2C',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  generateBtnDisabled: { shadowOpacity: 0.08, elevation: 1 },
+  generateBtnGrad: { paddingVertical: 17, alignItems: 'center' },
+  generateBtnText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.3 },
+
+  waitCard: {
+    backgroundColor: '#FDFAF4',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    shadowColor: '#3D2B1F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  waitType: { fontSize: 14, fontWeight: '700', color: '#8C6246' },
+  waitCodeLabel: { fontSize: 11, color: '#B5947A', letterSpacing: 2, fontWeight: '700' },
+  waitCode: { fontSize: 42, fontWeight: '900', color: '#3D2B1F', letterSpacing: 10 },
+  copyBtn: {
+    backgroundColor: '#F5ECD7',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+  },
+  copyBtnText: { fontSize: 14, fontWeight: '600', color: '#8C6246' },
+  waitNote: { fontSize: 13, color: '#B5947A', fontStyle: 'italic' },
+
+  // ── Join card ──
+  joinCard: {
+    backgroundColor: '#FDFAF4',
+    borderRadius: 24,
+    padding: 24,
+    gap: 18,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+  },
+  codeInput: {
+    backgroundColor: '#F5ECD7',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#3D2B1F',
+    textAlign: 'center',
+    letterSpacing: 8,
+  },
+});

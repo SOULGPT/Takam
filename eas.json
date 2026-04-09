@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "YOUR_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_YOUR_KEY",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "YOUR_GOOGLE_PLACES_KEY"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "YOUR_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_YOUR_KEY",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "YOUR_GOOGLE_PLACES_KEY"
+      }
+    },
+    "production": {
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "YOUR_SUPABASE_URL",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "YOUR_SUPABASE_ANON_KEY",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_YOUR_KEY",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "YOUR_GOOGLE_PLACES_KEY"
+      }
+    }
+  }
+}
