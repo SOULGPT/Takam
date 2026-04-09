@@ -562,4 +562,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sendIcon: { fontSize: 22, fontWeight: '800', color: '#FDFAF4' },
+
+  // Interactive UI Styles
+  bubbleReplyInner: { backgroundColor: 'rgba(255,255,255,0.25)', padding: 8, borderRadius: 12, marginBottom: 8 },
+  bubbleReplyName: { fontSize: 11, fontWeight: '800', color: '#FDFAF4', marginBottom: 2 },
+  bubbleReplyText: { fontSize: 13, color: '#FDFAF4', opacity: 0.9 },
+  
+  replyBanner: { flexDirection: 'row', backgroundColor: '#EDD9B8', padding: 12, alignItems: 'center' },
+  replyBannerContent: { flex: 1, paddingLeft: 8, borderLeftWidth: 3, borderLeftColor: '#C9705A' },
+  replyBannerLabel: { fontSize: 12, fontWeight: '700', color: '#C9705A', marginBottom: 2 },
+  replyBannerSnippet: { fontSize: 13, color: '#8C6246' },
+  replyBannerClose: { padding: 8 },
+  replyBannerCloseText: { fontSize: 18, color: '#8C6246', fontWeight: 'bold' },
+
+  pinnedBanner: { flexDirection: 'row', backgroundColor: '#FDFAF4', borderBottomWidth: 1.5, borderBottomColor: '#D9BC8A', paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', gap: 12 },
+  pinnedIcon: { fontSize: 18 },
+  pinnedLabel: { fontSize: 11, fontWeight: '700', color: '#C9705A', textTransform: 'uppercase' },
+  pinnedText: { fontSize: 13, color: '#3D2B1F', fontWeight: '500' },
+
+  contextButtonGroup: { backgroundColor: '#F5ECD7', borderRadius: 12, overflow: 'hidden' },
+  contextButton: { paddingVertical: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EDD9B8' },
+  contextButtonText: { fontSize: 16, fontWeight: '600', color: '#C9705A' },
+  contextSnippet: { fontSize: 14, color: '#8C6246', textAlign: 'center', paddingHorizontal: 16, paddingBottom: 16, fontStyle: 'italic' },
+  inputAreaWrapper: { backgroundColor: '#FDFAF4' },
 });
