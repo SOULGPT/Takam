@@ -12,7 +12,9 @@ import {
   Animated,
   Modal,
   Alert,
+  Dimensions,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -43,21 +45,30 @@ export default function ChatScreen() {
   
   // Context Menu State
   const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
+  const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const scaleAnim = useRef(new Animated.Value(0)).current;
 
-  const openContextMenu = (msg: Message) => {
+  const openContextMenu = (msg: Message, e: any) => {
+    const y = e.nativeEvent.pageY;
+    const x = e.nativeEvent.pageX;
+    
+    // Clamp Y to prevent clipping at the extreme top/bottom
+    const { height, width } = Dimensions.get('window');
+    const clampedY = Math.min(Math.max(y, 150), height - 250); 
+    
+    setContextPos({ x, y: clampedY });
     setContextMenuMsg(msg);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(slideAnim, { toValue: 0, friction: 8, tension: 50, useNativeDriver: true })
+      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true })
     ]).start();
   };
 
   const closeContextMenu = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(slideAnim, { toValue: 300, duration: 150, useNativeDriver: true })
+      Animated.timing(scaleAnim, { toValue: 0, duration: 150, useNativeDriver: true })
     ]).start(() => setContextMenuMsg(null));
   };
 
@@ -258,31 +269,43 @@ export default function ChatScreen() {
     const isMe = item.sender_id === session?.user?.id;
     const parentMsg = item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) : null;
 
+    const renderRightSwipe = () => (
+      <View style={{ justifyContent: 'center', paddingHorizontal: 20 }}>
+         <Text style={{ fontSize: 24, opacity: 0.5 }}>↩️</Text>
+      </View>
+    );
+
     return (
-      <View style={[styles.bubbleWrap, isMe ? styles.bubbleMeWrap : styles.bubbleThemWrap]}>
-        {!isMe && (
-          <View style={[styles.avatarSmall, { backgroundColor: meta.color }]}>
-            <Text style={styles.avatarSmallText}>{partnerInitial}</Text>
-          </View>
-        )}
-        <TouchableOpacity 
-          activeOpacity={0.8}
-          delayLongPress={250}
-          onLongPress={() => openContextMenu(item)}
-          style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
-        >
-          {parentMsg && (
-            <View style={styles.bubbleReplyInner}>
-              <Text style={styles.bubbleReplyName}>{parentMsg.sender_id === session?.user?.id ? 'You' : partnerName}</Text>
-              <Text style={styles.bubbleReplyText} numberOfLines={1}>{parentMsg.content}</Text>
+      <Swipeable
+        renderRightActions={isMe ? renderRightSwipe : undefined}
+        renderLeftActions={!isMe ? renderRightSwipe : undefined}
+        onSwipeableOpen={() => setReplyTarget(item)}
+      >
+        <View style={[styles.bubbleWrap, isMe ? styles.bubbleMeWrap : styles.bubbleThemWrap]}>
+          {!isMe && (
+            <View style={[styles.avatarSmall, { backgroundColor: meta.color }]}>
+              <Text style={styles.avatarSmallText}>{partnerInitial}</Text>
             </View>
           )}
-          <Text style={[styles.bubbleText, isMe && styles.bubbleMeText]}>{item.content}</Text>
-          <Text style={[styles.bubbleTime, isMe && styles.bubbleMeTime]}>
-            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            activeOpacity={0.8}
+            delayLongPress={250}
+            onLongPress={(e) => openContextMenu(item, e)}
+            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+          >
+            {parentMsg && (
+              <View style={styles.bubbleReplyInner}>
+                <Text style={styles.bubbleReplyName}>{parentMsg.sender_id === session?.user?.id ? 'You' : partnerName}</Text>
+                <Text style={styles.bubbleReplyText} numberOfLines={1}>{parentMsg.content}</Text>
+              </View>
+            )}
+            <Text style={[styles.bubbleText, isMe && styles.bubbleMeText]}>{item.content}</Text>
+            <Text style={[styles.bubbleTime, isMe && styles.bubbleMeTime]}>
+              {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Swipeable>
     );
   };
 
@@ -345,15 +368,22 @@ export default function ChatScreen() {
       )}
 
       {/* Context Menu Modal */}
-      <Modal visible={!!contextMenuMsg} transparent animationType="fade" onRequestClose={closeContextMenu}>
+      <Modal visible={!!contextMenuMsg} transparent animationType="none" onRequestClose={closeContextMenu}>
         <View style={StyleSheet.absoluteFill}>
           <Animated.View style={[styles.contextBackdrop, { opacity: fadeAnim }]}>
             <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeContextMenu} activeOpacity={1} />
           </Animated.View>
           
-          <Animated.View style={[styles.contextMenu, { transform: [{ translateY: slideAnim }] }]}>
-             <Text style={styles.contextHeader}>Message Options</Text>
-             <Text style={styles.contextSnippet} numberOfLines={2}>{contextMenuMsg?.content}</Text>
+          <Animated.View style={[
+            styles.contextMenu, 
+            { 
+              top: contextPos.y - 60,
+              transform: [{ scale: scaleAnim }],
+              opacity: fadeAnim
+            }
+          ]}>
+             <Text style={styles.contextHeader}>Options</Text>
+             <Text style={styles.contextSnippet} numberOfLines={1}>{contextMenuMsg?.content}</Text>
              
              <View style={styles.contextButtonGroup}>
                 <TouchableOpacity style={styles.contextButton} onPress={handleActionReply}>
@@ -369,10 +399,6 @@ export default function ChatScreen() {
                   <Text style={[styles.contextButtonText, { color: '#D32F2F' }]}>⚠️ Report</Text>
                 </TouchableOpacity>
              </View>
-             
-             <TouchableOpacity style={styles.contextCancelBtn} onPress={closeContextMenu}>
-               <Text style={styles.contextCancelText}>Cancel</Text>
-             </TouchableOpacity>
           </Animated.View>
         </View>
       </Modal>
@@ -458,6 +484,9 @@ const styles = StyleSheet.create({
   listContent: { paddingHorizontal: 16, paddingVertical: 16, gap: 12 },
   
   // Bubbles
+  contextBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26, 21, 19, 0.4)' },
+  contextMenu: { position: 'absolute', right: 40, width: 250, backgroundColor: '#FDFAF4', borderRadius: 20, padding: 8, shadowColor: '#000', shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 15 },
+  contextHeader: { fontSize: 12, fontWeight: '700', color: '#C5A870', textAlign: 'center', paddingTop: 12, paddingBottom: 8, textTransform: 'uppercase' },
   systemBubbleWrap: { alignItems: 'center', marginVertical: 16 },
   systemBubble: { backgroundColor: '#EDD9B8', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
   systemBubbleText: { fontSize: 12, fontWeight: '700', color: '#8C6246', textAlign: 'center' },
