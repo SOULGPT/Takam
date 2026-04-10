@@ -461,13 +461,14 @@ export default function ChatScreen() {
     const newMsg: Message = {
       id: optId,
       sender_id: session.user.id,
-      content: txt,
+      content: txt || '', // DB now allows NULL, but we keep empty string for UI consistency
       created_at: new Date().toISOString(),
       reply_to_id: replyTarget?.id,
       media_url: mediaUrl,
       media_type: mediaType,
     };
     setMessages((prev) => [newMsg, ...prev]);
+    const currentReplyTo = replyTarget?.id || null;
     setReplyTarget(null);
 
     try {
@@ -476,20 +477,24 @@ export default function ChatScreen() {
         .insert({
           bond_id: activeBondId,
           sender_id: session.user.id,
-          content: txt,
-          reply_to_id: replyTarget?.id || null,
+          content: txt || null, // Pass NULL to DB if no text
+          reply_to_id: currentReplyTo,
           media_url: mediaUrl,
           media_type: mediaType,
         })
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Insert error details:', error);
+        throw error;
+      }
       if (data) {
         setMessages((prev) => prev.map((m) => (m.id === optId ? (data as Message) : m)));
       }
     } catch (e: any) {
-      console.error('Send error:', e);
+      console.error('Full Send Error Details:', e);
+      Alert.alert('Send Failed', `Couldn't send your message: ${e.message || 'Unknown error'}`);
       setMessages((prev) => prev.filter((m) => m.id !== optId));
     } finally {
       setSending(false);
