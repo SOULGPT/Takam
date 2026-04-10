@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Animated,
   Modal,
+  Alert,
   Dimensions,
   ImageBackground,
 } from 'react-native';
