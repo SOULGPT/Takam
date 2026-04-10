@@ -50,16 +50,16 @@ export const CHAT_THEMES: Record<ChatThemeOption, ThemeConfig> = {
   classic: {
     id: 'classic',
     name: 'Classic Creme',
-    bgColors: ['#FDFAF4', '#F5ECD7', '#EDD9B8'],
-    textColor: '#3D2B1F',
-    myBubbleColor: '#C9705A',
-    themBubbleColor: '#FDFAF4',
-    myBubbleText: '#FDFAF4',
-    themBubbleText: '#3D2B1F',
-    borderColor: '#D9BC8A',
-    inputBgColor: '#F5ECD7',
-    inputTextColor: '#3D2B1F',
-    headerBgColor: '#FDFAF4',
+    bgColors: ['#F8F9FF', '#F0F2F9', '#E8EAF6'], // Slightly more lavender-tinted background
+    textColor: '#1A1A1A',
+    myBubbleColor: '#9B3D2C', // Deep Redish Brown from Ref
+    themBubbleColor: '#FFFFFF', // Clean White for partner
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#1A1A1A',
+    borderColor: '#E0E0E0',
+    inputBgColor: '#FFFFFF',
+    inputTextColor: '#1A1A1A',
+    headerBgColor: '#F8F9FF',
   },
   midnight: {
     id: 'midnight',

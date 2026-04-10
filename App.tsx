@@ -13,6 +13,8 @@ import { Session } from '@supabase/supabase-js';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AdminNavigator from './navigation/AdminNavigator';
 import UpgradeScreen from './screens/UpgradeScreen';
+import { signInWithGoogle } from './lib/auth/google';
+import { signInWithApple } from './lib/auth/apple';
 
 const RootStack = createNativeStackNavigator();
 
@@ -237,6 +239,8 @@ function AppCore() {
       <LandingScreen
         onGetStarted={() => setAuthFlow('signup')}
         onSignIn={() => setAuthFlow('signin')}
+        onGoogleSignIn={signInWithGoogle}
+        onAppleSignIn={signInWithApple}
       />
     );
   }

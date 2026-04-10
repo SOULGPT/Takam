@@ -10,6 +10,7 @@
     "build": "expo export -p web"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@gorhom/bottom-sheet": "^5.2.8",
     "@react-native-google-signin/google-signin": "^16.1.2",
     "@react-navigation/bottom-tabs": "^7.15.9",
@@ -22,7 +23,9 @@
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
     "expo-device": "~8.0.10",
+    "expo-file-system": "~19.0.21",
     "expo-haptics": "~15.0.8",
+    "expo-image-picker": "~17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.11",
     "expo-notifications": "~0.32.16",

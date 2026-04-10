@@ -18,12 +18,36 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { playSound } from '../lib/sound';
 
+// New Velvet Pulse Components
+import BlobAvatar from '../components/BlobAvatar';
+import VibeCard from '../components/VibeCard';
+import WalkieTalkieView from '../components/WalkieTalkieView';
+import { startRecording, stopRecordingAndUpload, playBurst, requestMicrophonePermission } from '../lib/walkieTalkie';
+
 const { width, height } = Dimensions.get('window');
 
 const VIBES = [
-  { id: 'miss_you',       emoji: '🌙', label: 'I Miss You',         color: '#8B7BA8' },
-  { id: 'love',           emoji: '🌹', label: 'Sending Love',        color: '#C9705A' },
-  { id: 'thinking_of_you',emoji: '🌸', label: 'Thinking of You',     color: '#B5947A' },
+  { 
+    id: 'thought', 
+    emoji: '🧠', 
+    label: 'Thinking of You', 
+    sub: 'Send a gentle mental nudge', 
+    color: '#44674D' 
+  },
+  { 
+    id: 'love', 
+    emoji: '❤', 
+    label: 'Sending Love', 
+    sub: 'A warm pulse of affection', 
+    color: '#C9705A' 
+  },
+  { 
+    id: 'checkin', 
+    emoji: '👋', 
+    label: 'Just Checking In', 
+    sub: 'Saying hi without the noise', 
+    color: '#B5947A' 
+  },
 ];
 
 export default function HomeScreen() {
@@ -31,6 +55,8 @@ export default function HomeScreen() {
   const { profile, bonds, bondMembers, activeBondId, setActiveBondId } = useStore();
   const [sending, setSending] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
+  const [isWalkieActive, setIsWalkieActive] = useState(false);
+
   
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -122,7 +148,20 @@ export default function HomeScreen() {
   }, [vibeQueue, playingVibe]);
 
   // 3. Listener from useVibes hook (just push to queue)
-  const handleVibeReceived = useCallback((vibe: any) => {
+  const handleVibeReceived = useCallback(async (vibe: any) => {
+    // Special handling for Walkie Bursts (Auto-Play)
+    if (vibe.vibe_type === 'walkie_burst' && vibe.content) {
+      try {
+        await playBurst(vibe.content, async () => {
+          // Cleanup after play (Ephemeral logic)
+          // We mark as read and could theoretically delete the asset here if we had an edge function
+          console.log('Walkie burst finished playing');
+        });
+      } catch (e) {
+        console.error('Failed to auto-play walkie burst', e);
+      }
+      return;
+    }
     setVibeQueue(q => [...q, vibe]);
   }, []);
 
@@ -144,6 +183,29 @@ export default function HomeScreen() {
       Alert.alert('Could not send', e.message ?? 'Try again.');
     } finally {
       setSending(null);
+    }
+  };
+
+  const handleStartTalk = async () => {
+    if (!(await requestMicrophonePermission())) {
+      Alert.alert('Permission Denied', 'Mic access is needed for Walkie-Talkie');
+      return;
+    }
+    try {
+      await startRecording();
+    } catch (e) {
+      Alert.alert('Error', 'Failed to start recording');
+    }
+  };
+
+  const handleStopTalk = async () => {
+    try {
+      const audioUrl = await stopRecordingAndUpload(activeBondId!, profile!.id);
+      if (audioUrl) {
+        await sendVibe(activeBondId!, 'walkie_burst', audioUrl);
+      }
+    } catch (e) {
+      console.error('Failed to send Walkie Burst', e);
     }
   };
 
@@ -190,67 +252,92 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F5ECD7" />
+      {/* ── Background Decoration ── */}
+      <StatusBar barStyle="dark-content" />
       <LinearGradient
         colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']}
         style={StyleSheet.absoluteFill}
       />
 
-      {/* ── Active Bond Switcher (Top pill) ─────────── */}
-      {activeBonds.length > 1 && (
-        <View style={styles.bondSwitcherWrap}>
+      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 60, paddingBottom: 100 }}>
+        {/* ── Active Bond Switcher (Organic Blobs) ─────────── */}
+        <View style={styles.bondsSection}>
+          <View style={styles.bondsHeader}>
+            <Text style={styles.bondsLabel}>Active Bonds</Text>
+            <View style={styles.onlineBadge}>
+              <Text style={styles.onlineText}>{activeBonds.length} Online</Text>
+            </View>
+          </View>
+          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bondSwitcherScroll}>
             {activeBonds.map((b) => {
-              const meta = BOND_META[b.bond_type] ?? BOND_META.other;
               const bPartner = bondMembers[b.id];
-              const bName = bPartner?.display_name || bPartner?.username || meta.label;
+              const pName = bPartner?.display_name || bPartner?.username || 'Partner';
               const isActive = b.id === activeBondId;
 
               return (
                 <TouchableOpacity
                   key={b.id}
-                  style={[styles.bondPill, isActive && { backgroundColor: meta.color, borderColor: meta.color }]}
+                  style={styles.bondMember}
                   onPress={() => setActiveBondId(b.id)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.bondPillEmoji, isActive && { opacity: 1 }]}>{meta.emoji}</Text>
-                  <Text style={[styles.bondPillText, isActive && { color: '#FDFAF4', fontWeight: '700' }]}>
-                    {bName}
-                  </Text>
+                  <BlobAvatar 
+                    initials={initials(pName)} 
+                    color={BOND_META[b.bond_type]?.color || '#B5947A'}
+                    isActive={isActive}
+                    size={isActive ? 90 : 75}
+                  />
+                  <Text style={[styles.bondMemberName, isActive && { color: '#C9705A', fontWeight: '800' }]}>{pName}</Text>
+                  <Text style={styles.bondMemberRole}>{BOND_META[b.bond_type]?.label}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         </View>
-      )}
 
-      {/* ── Partner card ─────────────────────────────────────────────── */}
-      <Animated.View style={[styles.partnerCard, activeBonds.length <= 1 && { marginTop: 100 }]}>
-        <View style={styles.avatarRow}>
-          {/* My avatar */}
-          <View style={[styles.avatar, { backgroundColor: '#C9705A' }]}>
-            <Text style={styles.avatarText}>{initials(myName)}</Text>
-          </View>
+        {/* ── Dynamic Layout: Vibes vs Walkie ────────────────────────────────── */}
+        <View style={styles.mainContent}>
+          {isWalkieActive ? (
+            <WalkieTalkieView 
+              partnerName={partnerName}
+              onBack={() => setIsWalkieActive(false)}
+              onStartTalk={handleStartTalk}
+              onStopTalk={handleStopTalk}
+            />
+          ) : (
+            <View style={styles.vibesContainer}>
+              <View style={styles.vibesHeader}>
+                <Text style={styles.vibesTitle}>Send Vibes to {partnerName}</Text>
+                <TouchableOpacity 
+                  style={styles.walkieToggle} 
+                  onPress={() => setIsWalkieActive(true)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.walkieToggleIcon}>📶</Text>
+                  <Text style={styles.walkieToggleText}>START WALKIE</Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* Bond connector */}
-          <View style={styles.connectorWrap}>
-            <Text style={styles.connectorIcon}>{bondMeta.emoji}</Text>
-            <View style={[styles.connectorLine, { backgroundColor: bondMeta.color }]} />
-          </View>
-
-          {/* Partner avatar */}
-          <View style={[styles.avatar, { backgroundColor: bondMeta.color }]}>
-            <Text style={styles.avatarText}>{initials(partnerName)}</Text>
-          </View>
+              <View style={styles.vibeCardList}>
+                {VIBES.map((v) => (
+                  <VibeCard 
+                    key={v.id}
+                    title={v.label}
+                    description={v.sub}
+                    emoji={v.emoji}
+                    color={v.color}
+                    onPress={() => handleSend(v.id)}
+                    loading={sending === v.id}
+                  />
+                ))}
+              </View>
+            </View>
+          )}
         </View>
+      </ScrollView>
 
-        <Text style={styles.partnerName}>{partnerName}</Text>
-        <Text style={styles.partnerSub}>
-          {bondMeta.emoji} {bondMeta.label} Bond · Connected
-        </Text>
-      </Animated.View>
-
-      {/* ── Open Chat Button ──────────────────────────────────────────── */}
+      {/* ── Open Chat Button (Pinned to Bottom-ish) ────────────────────────────────── */}
       <TouchableOpacity 
         style={styles.chatButton} 
         onPress={() => nav.navigate('Chat')} 
@@ -265,6 +352,7 @@ export default function HomeScreen() {
         )}
       </TouchableOpacity>
 
+
       {/* ── Feedback after sending ────────────────────────────────────── */}
       {lastSent && (
         <View style={styles.sentBadge}>
@@ -274,36 +362,6 @@ export default function HomeScreen() {
           </Text>
         </View>
       )}
-
-      {/* ── Vibe buttons ─────────────────────────────────────────────── */}
-      <View style={styles.vibesSection}>
-        <Text style={styles.vibesLabel}>Send a Vibe</Text>
-        <View style={styles.vibeGrid}>
-          {VIBES.map((vibe) => (
-            <TouchableOpacity
-              key={vibe.id}
-              style={[
-                styles.vibeButton,
-                sending === vibe.id && styles.vibeButtonSending,
-              ]}
-              onPress={() => handleSend(vibe.id)}
-              disabled={!!sending}
-              activeOpacity={0.8}
-            >
-              {sending === vibe.id ? (
-                <ActivityIndicator color={vibe.color} />
-              ) : (
-                <>
-                  <Text style={styles.vibeEmoji}>{vibe.emoji}</Text>
-                  <Text style={[styles.vibeLabel, { color: vibe.color }]}>
-                    {vibe.label}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
 
       {/* ── Persistent Vibe Overlay (Absolute Full Screen) ──────────── */}
       {playingVibe && (
@@ -328,6 +386,97 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F5ECD7' },
 
+  // Empty State (Missing Styles restored)
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    gap: 16,
+    marginTop: -40,
+  },
+  emptyEmoji: { fontSize: 64 },
+  emptyTitle: { fontSize: 24, fontWeight: '900', color: '#3D2B1F', marginBottom: 12, textAlign: 'center' },
+  emptySub: { fontSize: 15, color: '#8C6246', textAlign: 'center', lineHeight: 22, opacity: 0.8 },
+  emptyBtn: { marginTop: 10, borderRadius: 20, overflow: 'hidden' },
+  emptyBtnGrad: { paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center' },
+  emptyBtnText: { fontSize: 15, fontWeight: '700', color: '#FDFAF4' },
+
+  // Header (Restored Minimal Style)
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 24,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 16 
+  },
+  logoText: { 
+    fontSize: 28, 
+    fontWeight: '900', 
+    color: '#3D2B1F', 
+    letterSpacing: -1 
+  },
+  settingsBtn: { 
+    width: 44, 
+    height: 44, 
+    borderRadius: 22, 
+    backgroundColor: '#FDFAF4', 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2
+  },
+
+  // Active Bonds Section
+  bondsSection: { marginTop: 24, paddingHorizontal: 0 },
+  bondsHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 24,
+    marginBottom: 16 
+  },
+  bondsLabel: { fontSize: 10, fontWeight: '800', color: '#8C6246', letterSpacing: 1.5, textTransform: 'uppercase' },
+  onlineBadge: { backgroundColor: 'rgba(160, 65, 45, 0.1)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  onlineText: { fontSize: 9, fontWeight: '800', color: '#A0412D' },
+  
+  bondSwitcherScroll: { paddingHorizontal: 16, gap: 12, paddingBottom: 10 },
+  bondMember: { alignItems: 'center', width: 100 },
+  bondMemberName: { fontSize: 13, fontWeight: '700', color: '#3D2B1F', marginTop: 8 },
+  bondMemberRole: { fontSize: 9, fontWeight: '800', color: '#8C6246', textTransform: 'uppercase', opacity: 0.6 },
+
+  // Main Content
+  mainContent: { flex: 1, paddingHorizontal: 24, marginTop: 24, paddingBottom: 40 },
+  vibesContainer: { gap: 20 },
+  vibesHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  vibesTitle: { fontSize: 20, fontWeight: '800', color: '#3D2B1F' },
+  walkieToggle: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 6, 
+    backgroundColor: 'rgba(160, 65, 45, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24
+  },
+  walkieToggleIcon: { fontSize: 14 },
+  walkieToggleText: { fontSize: 10, fontWeight: '800', color: '#A0412D', letterSpacing: 1 },
+  vibeCardList: { gap: 12 },
+
   // ── Overlay ──
   overlay: {
     justifyContent: 'center',
@@ -338,130 +487,28 @@ const styles = StyleSheet.create({
   overlayTitle: { fontSize: 32, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.5, textAlign: 'center' },
   overlaySub: { fontSize: 16, color: '#FDFAF4', opacity: 0.8, marginTop: 8 },
 
-  // ── Empty State ──
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 16,
-    marginTop: -40,
-  },
-  emptyEmoji: { fontSize: 64 },
-  emptyTitle: { fontSize: 24, fontWeight: '800', color: '#3D2B1F', textAlign: 'center' },
-  emptySub: { fontSize: 15, color: '#8C6246', textAlign: 'center', lineHeight: 22 },
-  emptyBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginTop: 12,
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  emptyBtnGrad: { paddingVertical: 14, paddingHorizontal: 24, alignItems: 'center' },
-  emptyBtnText: { fontSize: 15, fontWeight: '700', color: '#FDFAF4' },
-
-  // ── Active Bond Switcher ──
-  bondSwitcherWrap: {
-    paddingTop: 56,
-    paddingBottom: 8,
-  },
-  bondSwitcherScroll: {
-    paddingHorizontal: 16,
-    gap: 10,
-  },
-  bondPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FDFAF4',
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-  },
-  bondPillEmoji: { fontSize: 14, opacity: 0.8 },
-  bondPillText: { fontSize: 13, fontWeight: '600', color: '#8C6246' },
-
-  // ── Partner card ─────────────────────────────────────────────────────────
-  partnerCard: {
-    marginTop: 40,
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    gap: 16,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 0,
-  },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#F5ECD7',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  avatarText: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: '#FDFAF4',
-  },
-  connectorWrap: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
-  },
-  connectorIcon: { fontSize: 24, marginBottom: 6 },
-  connectorLine: {
-    width: 48,
-    height: 3,
-    borderRadius: 2,
-    opacity: 0.7,
-  },
-  partnerName: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#3D2B1F',
-    letterSpacing: 0.3,
-    textAlign: 'center',
-  },
-  partnerSub: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#8C6246',
-    textAlign: 'center',
-  },
-
-  // ── Chat Button ─────────────────────────────────────────────────────────
+  // ── Chat Button ──
   chatButton: {
+    position: 'absolute',
+    bottom: 24,
+    left: 24,
+    right: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FDFAF4',
-    marginHorizontal: 40,
-    marginTop: 24,
-    paddingVertical: 14,
-    borderRadius: 20,
+    paddingVertical: 16,
+    borderRadius: 24,
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
     shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
   },
   chatIcon: { fontSize: 18, marginRight: 8 },
-  chatBtnText: { fontSize: 15, fontWeight: '700', color: '#3D2B1F' },
+  chatBtnText: { fontSize: 16, fontWeight: '800', color: '#3D2B1F' },
   unreadBadge: {
     marginLeft: 8,
     backgroundColor: '#C9705A',
@@ -474,66 +521,18 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: { fontSize: 11, fontWeight: '800', color: '#FDFAF4' },
 
-  // ── Sent feedback ─────────────────────────────────────────────────────────
+  // ── Feedback Badge ──
   sentBadge: {
-    marginHorizontal: 28,
-    marginTop: 16,
+    position: 'absolute',
+    top: 120,
+    left: 40,
+    right: 40,
     backgroundColor: '#EDD9B8',
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 16,
     alignItems: 'center',
+    zIndex: 10,
   },
-  sentText: {
-    fontSize: 13,
-    color: '#5C3D2E',
-    fontWeight: '600',
-  },
-
-  // ── Vibe buttons ─────────────────────────────────────────────────────────
-  vibesSection: {
-    marginTop: 32,
-    paddingHorizontal: 24,
-    gap: 14,
-  },
-  vibesLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#B5947A',
-    letterSpacing: 1.5,
-    textTransform: 'uppercase',
-    textAlign: 'center',
-  },
-  vibeGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-  },
-  vibeButton: {
-    backgroundColor: '#FDFAF4',
-    borderRadius: 20,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    gap: 8,
-    width: (width - 48 - 24) / 3,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  vibeButtonSending: {
-    opacity: 0.6,
-  },
-  vibeEmoji: { fontSize: 28 },
-  vibeLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 15,
-  },
+  sentText: { fontSize: 13, color: '#5C3D2E', fontWeight: '600' },
 });

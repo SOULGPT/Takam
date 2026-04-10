@@ -8,10 +8,20 @@ import {
   StatusBar,
   Animated,
   ScrollView,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { isAppleSignInAvailable } from '../lib/auth/apple';
 
 const { width, height } = Dimensions.get('window');
+
+export interface LandingScreenProps {
+  onGetStarted: () => void;
+  onSignIn: () => void;
+  onGoogleSignIn: () => Promise<void>;
+  onAppleSignIn: () => Promise<void>;
+}
 
 // ── Floating heart particle ───────────────────────────────────────────────────
 function Heart({ delay, x, size }: { delay: number; x: number; size: number }) {
@@ -128,12 +138,13 @@ function FeatureCard({
 }
 
 // ── Main landing screen ─────────────────────────────────────────────────────
-interface Props {
-  onGetStarted: () => void;
-  onSignIn: () => void;
-}
-
-export default function LandingScreen({ onGetStarted, onSignIn }: Props) {
+export default function LandingScreen({ 
+  onGetStarted, 
+  onSignIn,
+  onGoogleSignIn,
+  onAppleSignIn
+}: LandingScreenProps) {
+  const [loading, setLoading] = useState<'google' | 'apple' | null>(null);
   const logoScale = useRef(new Animated.Value(0.6)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const heroOpacity = useRef(new Animated.Value(0)).current;
@@ -329,8 +340,48 @@ export default function LandingScreen({ onGetStarted, onSignIn }: Props) {
             </Text>
           </TouchableOpacity>
 
+          <View style={styles.socialDivider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR JOIN WITH</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <View style={styles.socialRow}>
+            <TouchableOpacity 
+              style={styles.socialBtn} 
+              onPress={async () => {
+                setLoading('google');
+                try { await onGoogleSignIn(); } catch(e: any) { Alert.alert('Error', e.message); }
+                finally { setLoading(null); }
+              }}
+              disabled={!!loading}
+            >
+              <View style={styles.socialIconBox}>
+                {loading === 'google' ? <ActivityIndicator size="small" color="#3D2B1F" /> : <Text style={styles.socialIconText}>G</Text>}
+              </View>
+              <Text style={styles.socialBtnText}>Google</Text>
+            </TouchableOpacity>
+
+            {isAppleSignInAvailable && (
+              <TouchableOpacity 
+                style={styles.socialBtn} 
+                onPress={async () => {
+                  setLoading('apple');
+                  try { await onAppleSignIn(); } catch(e: any) { if (e.code !== 'ERR_CANCELED') Alert.alert('Error', e.message); }
+                  finally { setLoading(null); }
+                }}
+                disabled={!!loading}
+              >
+                <View style={[styles.socialIconBox, { backgroundColor: '#1A0F09' }]}>
+                   {loading === 'apple' ? <ActivityIndicator size="small" color="#F5ECD7" /> : <Text style={[styles.socialIconText, { color: '#F5ECD7' }]}></Text>}
+                </View>
+                <Text style={styles.socialBtnText}>Apple</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
           <Text style={styles.termsNote}>
-            Free to start · No credit card required
+            Free to start · Safe and Encrypted
           </Text>
         </Animated.View>
       </ScrollView>
@@ -555,5 +606,67 @@ const styles = StyleSheet.create({
     color: '#B5947A',
     textAlign: 'center',
     marginTop: 2,
+  },
+  // Social Sections
+  socialDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginVertical: 12,
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#EDD9B8',
+  },
+  dividerText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B5947A',
+    letterSpacing: 1.5,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  socialBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FDFAF4',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    gap: 10,
+    shadowColor: '#3D2B1F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  socialIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: '#F5ECD7',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  socialIconText: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#3D2B1F',
+  },
+  socialBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#3D2B1F',
   },
 });

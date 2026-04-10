@@ -76,7 +76,7 @@ export function useVibes(onVibeReceived?: (vibe: any) => void) {
   return channelRef;
 }
 
-export async function sendVibe(bondId: string, vibeType: string): Promise<void> {
+export async function sendVibe(bondId: string, vibeType: string, content?: string): Promise<void> {
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -86,6 +86,7 @@ export async function sendVibe(bondId: string, vibeType: string): Promise<void> 
     bond_id: bondId,
     sender_id: user.id,
     vibe_type: vibeType,
+    content: content,
   });
 
   if (error) throw new Error(error.message);

@@ -17,8 +17,11 @@ import {
   Image,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
@@ -26,6 +29,7 @@ import { supabase } from '../lib/supabase';
 import { useStore, BOND_META, CHAT_THEMES, ChatThemeOption } from '../store/useStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
+import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 
 type Message = {
   id: string;
@@ -35,6 +39,67 @@ type Message = {
   is_system?: boolean;
   reply_to_id?: string;
   is_pinned?: boolean;
+  media_url?: string;
+  media_type?: 'text' | 'image' | 'audio';
+};
+
+// ── Audio Bubble Helper ──────────────────────────────────────────────────────
+const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: any }) => {
+  const [playing, setPlaying] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [pos, setPos] = useState(0);
+  const [duration, setDuration] = useState(1);
+
+  useEffect(() => {
+    return () => { if (sound) sound.unloadAsync(); };
+  }, [sound]);
+
+  const togglePlayback = async () => {
+    if (sound) {
+      if (playing) await sound.pauseAsync();
+      else await sound.playAsync();
+      setPlaying(!playing);
+    } else {
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true },
+        (status: any) => {
+          if (status.isLoaded) {
+            setPos(status.positionMillis);
+            setDuration(status.durationMillis || 1);
+            if (status.didJustFinish) {
+              setPlaying(false);
+              newSound.setPositionAsync(0);
+            }
+          }
+        }
+      );
+      setSound(newSound);
+      setPlaying(true);
+    }
+  };
+
+  const progress = (pos / duration) * 100;
+
+  return (
+    <View style={styles.audioBubbleContainer}>
+      <TouchableOpacity onPress={togglePlayback} style={[styles.playBtn, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)' }]}>
+        <Ionicons 
+          name={playing ? 'pause' : 'play'} 
+          size={18} 
+          color={isMe ? theme.myBubbleText : theme.themBubbleText} 
+        />
+      </TouchableOpacity>
+      <View style={styles.audioMeta}>
+        <View style={styles.track}>
+          <View style={[styles.progress, { width: `${progress}%`, backgroundColor: isMe ? theme.myBubbleText : theme.themBubbleText }]} />
+        </View>
+        <Text style={[styles.audioTime, { color: isMe ? theme.myBubbleText : theme.themBubbleText }]}>
+          {Math.floor(duration / 1000)}s
+        </Text>
+      </View>
+    </View>
+  );
 };
 
 export default function ChatScreen() {
@@ -52,6 +117,13 @@ export default function ChatScreen() {
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  
+  // Media State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [recordDuration, setRecordDuration] = useState(0);
+  const recordInterval = useRef<any>(null);
+  const slideX = useRef(new Animated.Value(0)).current; // For slide to cancel
 
   // Theme State
   const [themePickerVisible, setThemePickerVisible] = useState(false);
@@ -227,16 +299,94 @@ export default function ChatScreen() {
     };
   }, [activeBondId, session?.user, partnerProfile]);
 
-  // ── 3. Send Message ─────────────────────────────────────────────────────────
-  const handleSend = async () => {
-    const txt = inputText.trim();
-    if (!txt || !session?.user || !activeBondId || sending) return;
+  // ── 3. Media Helpers ────────────────────────────────────────────────────────
+  const uploadFile = async (uri: string, type: 'image' | 'audio') => {
+    if (!activeBondId || !session?.user) return null;
+    try {
+      const ext = type === 'image' ? 'jpg' : 'm4a';
+      const path = `${activeBondId}/${Date.now()}.${ext}`;
+      
+      // Convert to base64 for upload
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const { decode } = await import('../lib/walkieTalkie');
+      const bytes = decode(base64);
+
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(path, bytes, { contentType: type === 'image' ? 'image/jpeg' : 'audio/m4a' });
+
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(data.path);
+      return publicUrl;
+    } catch (e) {
+      console.error('Upload error:', e);
+      return null;
+    }
+  };
+
+  const handlePickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') return;
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      quality: 0.6, // Compression as requested
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const url = await uploadFile(result.assets[0].uri, 'image');
+      if (url) handleSend(undefined, url, 'image');
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') return;
+
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(newRecording);
+      setIsRecording(true);
+      setRecordDuration(0);
+      recordInterval.current = setInterval(() => setRecordDuration(d => d + 1), 1000);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } catch (e) {
+      console.error('Record start error:', e);
+    }
+  };
+
+  const stopRecording = async (shouldCancel: boolean) => {
+    if (!recording) return;
+
+    setIsRecording(false);
+    clearInterval(recordInterval.current);
+    try {
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      if (!shouldCancel && uri) {
+        const url = await uploadFile(uri, 'audio');
+        if (url) handleSend(undefined, url, 'audio');
+      }
+    } catch (e) {
+      console.error('Record stop error:', e);
+    }
+  };
+
+  // ── 4. Send Message ─────────────────────────────────────────────────────────
+  const handleSend = async (overrideText?: string, mediaUrl?: string, mediaType: 'text' | 'image' | 'audio' = 'text') => {
+    const txt = (overrideText ?? inputText).trim();
+    if (!mediaUrl && !txt) return;
+    if (!session?.user || !activeBondId || sending) return;
 
     setSending(true);
-    setInputText('');
+    if (!mediaUrl) setInputText('');
     playSound('send');
 
-    // Optimistic UI update
+    // Optimistic UI
     const optId = `temp-${Date.now()}`;
     const newMsg: Message = {
       id: optId,
@@ -244,6 +394,8 @@ export default function ChatScreen() {
       content: txt,
       created_at: new Date().toISOString(),
       reply_to_id: replyTarget?.id,
+      media_url: mediaUrl,
+      media_type: mediaType,
     };
     setMessages((prev) => [newMsg, ...prev]);
     setReplyTarget(null);
@@ -256,23 +408,19 @@ export default function ChatScreen() {
           sender_id: session.user.id,
           content: txt,
           reply_to_id: replyTarget?.id || null,
+          media_url: mediaUrl,
+          media_type: mediaType,
         })
         .select()
         .single();
       
       if (error) throw error;
-      
-      // Replace optimistic message with actual DB message
       if (data) {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === optId ? (data as Message) : m))
-        );
+        setMessages((prev) => prev.map((m) => (m.id === optId ? (data as Message) : m)));
       }
     } catch (e: any) {
       console.error('Send error:', e);
-      // Revert optimistic if error
       setMessages((prev) => prev.filter((m) => m.id !== optId));
-      setInputText(txt);
     } finally {
       setSending(false);
     }
@@ -298,7 +446,7 @@ export default function ChatScreen() {
         return (
           <View style={styles.milestoneContainer}>
             <View style={styles.milestoneIconBox}>
-              <Text style={{ fontSize: 32 }}>❤️</Text>
+              <Ionicons name="heart" size={32} color={th.myBubbleColor} />
             </View>
             <Text style={styles.milestoneTitle}>New Milestone Unlocked</Text>
             <Text style={styles.milestoneDesc}>{item.content.replace('[TAKAM SYSTEM]', '').trim()}</Text>
@@ -324,6 +472,20 @@ export default function ChatScreen() {
       </View>
     );
 
+    const renderMediaContent = () => {
+      if (item.media_type === 'image') {
+        return (
+          <TouchableOpacity onPress={() => {/* Expand View */}}>
+            <Image source={{ uri: item.media_url }} style={styles.bubbleImage} />
+          </TouchableOpacity>
+        );
+      }
+      if (item.media_type === 'audio') {
+        return <AudioBubble uri={item.media_url!} isMe={isMe} theme={th} />;
+      }
+      return <Text style={[styles.bubbleText, { color: isMe ? th.myBubbleText : th.themBubbleText }]}>{item.content}</Text>;
+    };
+
     return (
       <Swipeable
         renderRightActions={isMe ? renderRightSwipe : undefined}
@@ -335,7 +497,6 @@ export default function ChatScreen() {
       >
         <View style={[styles.bubbleWrap, isMe ? styles.bubbleMeWrap : styles.bubbleThemWrap]}>
           <View style={{ maxWidth: '85%' }}>
-            {/* Meta Row: Name + Time above bubble */}
             <View style={[styles.bubbleMeta, isMe ? styles.bubbleMetaMe : null]}>
               {!isMe && <Text style={styles.bubbleName}>{partnerName}</Text>}
               <Text style={styles.bubbleTime}>
@@ -351,6 +512,7 @@ export default function ChatScreen() {
               style={[
                 styles.bubble, 
                 isMe ? styles.bubbleMe : styles.bubbleThem, 
+                item.media_type === 'image' && styles.bubbleImageContainer,
                 { backgroundColor: isMe ? th.myBubbleColor : th.themBubbleColor }
               ]}
             >
@@ -360,7 +522,7 @@ export default function ChatScreen() {
                   <Text style={[styles.bubbleReplyText, { color: isMe ? th.myBubbleText : th.themBubbleText }]} numberOfLines={1}>{parentMsg.content}</Text>
                 </View>
               )}
-              <Text style={[styles.bubbleText, isMe ? styles.bubbleMeText : null, { color: isMe ? th.myBubbleText : th.themBubbleText }]}>{item.content}</Text>
+              {renderMediaContent()}
             </TouchableOpacity>
           </View>
         </View>
@@ -371,56 +533,58 @@ export default function ChatScreen() {
   const pinnedMessage = messages.find(m => m.is_pinned);
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { paddingBottom: insets.bottom }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
-      
-      <ImageBackground 
-        source={require('../assets/chat-bg-pattern.png')} 
-        style={StyleSheet.absoluteFill}
-        imageStyle={{ opacity: 0.04, tintColor: th.textColor }}
-        resizeMode="repeat"
-      />
-
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 8, borderBottomColor: th.borderColor }]}>
-        <BlurView intensity={30} tint="light" style={StyleSheet.absoluteFill} />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        style={[styles.root, { paddingBottom: insets.bottom }]}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
         
+        <ImageBackground 
+          source={require('../assets/chat-bg-pattern.png')} 
+          style={StyleSheet.absoluteFill}
+          imageStyle={{ opacity: 0.04, tintColor: th.textColor }}
+          resizeMode="repeat"
+        />
+
+      {/* ── Ref 4 Ultra-Clean Header ── */}
+      <View style={[styles.header, { paddingTop: insets.top + 12, backgroundColor: th.headerBgColor }]}>
         <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
-          <Text style={[styles.backText, { color: th.textColor }]}>←</Text>
+          <Ionicons name="chevron-back" size={28} color={th.textColor} />
         </TouchableOpacity>
 
         <View style={styles.headerInfo}>
-          <View style={[styles.headerAvatarContainer, { borderColor: th.myBubbleColor }]}>
+          <TouchableOpacity style={[styles.headerAvatarContainer, { borderColor: th.myBubbleColor, backgroundColor: '#EEE' }]}>
             {partnerProfile?.avatar_url ? (
               <Image source={{ uri: partnerProfile.avatar_url }} style={styles.headerAvatar} />
             ) : (
               <View style={[styles.headerAvatar, { backgroundColor: th.myBubbleColor }]}>
-                <Text style={styles.headerAvatarText}>
-                  {partnerInitial}
-                </Text>
+                <Text style={styles.headerAvatarText}>{partnerInitial}</Text>
               </View>
             )}
             <View style={[styles.onlineIndicator, isPartnerOnline && styles.onlineIndicatorActive]} />
-          </View>
+          </TouchableOpacity>
           
           <View>
-            <Text style={[styles.headerTitle, { color: th.textColor }]}>{partnerName}</Text>
-            <Text style={styles.headerStatus}>{isPartnerOnline ? 'Online' : 'Offline'}</Text>
+            <Text style={[styles.headerTitle, { color: th.textColor }]}>Looming Bonds</Text>
+            <Text style={[styles.headerStatus, { color: th.myBubbleColor }]}>BONDED WITH {partnerName.toUpperCase()}</Text>
           </View>
         </View>
 
-        <TouchableOpacity onPress={() => setThemePickerVisible(true)}>
-          <Text style={{ fontSize: 24 }}>🎨</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+           <TouchableOpacity style={styles.headerActionBtn}>
+             <Ionicons name="videocam-outline" size={22} color={th.textColor} />
+           </TouchableOpacity>
+           <TouchableOpacity style={styles.headerActionBtn} onPress={() => setThemePickerVisible(true)}>
+             <Ionicons name="ellipsis-vertical" size={20} color={th.textColor} />
+           </TouchableOpacity>
+        </View>
       </View>
 
       {/* Pinned Message */}
       {pinnedMessage && (
         <View style={styles.pinnedBanner}>
-          <Text style={styles.pinnedIcon}>📌</Text>
+          <Ionicons name="pin" size={16} color="#BDBDBD" style={{ marginRight: 12 }} />
           <View style={{ flex: 1 }}>
             <Text style={styles.pinnedLabel}>Pinned Message</Text>
             <Text style={styles.pinnedText} numberOfLines={1}>{pinnedMessage.content}</Text>
@@ -439,7 +603,7 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderBubble}
           inverted={true}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]} 
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -503,244 +667,298 @@ export default function ChatScreen() {
          </View>
       </Modal>
 
-      {/* Input Area Group */}
-      <View style={[styles.inputAreaWrapper, { paddingBottom: insets.bottom + 16 }]}>
-        {replyTarget && (
-          <View style={[styles.replyBanner, { backgroundColor: th.inputBgColor, borderLeftColor: th.myBubbleColor }]}>
-            <View style={styles.replyBannerContent}>
-              <Text style={[styles.replyBannerLabel, { color: th.myBubbleColor }]}>
-                Replying to {replyTarget.sender_id === session?.user?.id ? 'yourself' : partnerName}
-              </Text>
-              <Text style={styles.replyBannerSnippet} numberOfLines={1}>
-                {replyTarget.content}
-              </Text>
+        {/* ── Ref 4 Ultra-Clean Footer (Solid Background) ── */}
+        <View style={[styles.footerContainer, { backgroundColor: th.bgColors[2], paddingBottom: insets.bottom + 8 }]}>
+          {replyTarget && (
+            <View style={[styles.replyBanner, { backgroundColor: '#FFF', borderLeftColor: th.myBubbleColor }]}>
+               <View style={styles.replyBannerContent}>
+                  <Text style={[styles.replyBannerLabel, { color: th.myBubbleColor }]}>REPLYING TO {replyTarget.sender_id === session?.user?.id ? 'YOU' : partnerName.toUpperCase()}</Text>
+                  <Text style={styles.replyBannerSnippet} numberOfLines={1}>{replyTarget.content}</Text>
+               </View>
+               <TouchableOpacity onPress={() => setReplyTarget(null)} style={styles.replyBannerClose}>
+                 <Ionicons name="close" size={20} color="#888" />
+               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => setReplyTarget(null)} style={styles.replyBannerClose}>
-              <Text style={{ fontSize: 18, color: th.textColor }}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+          )}
 
-        <View style={[styles.inputFloatContainer, { backgroundColor: th.headerBgColor, borderColor: th.borderColor }]}>
-          {/* Attachment Button */}
-          <TouchableOpacity style={styles.inputActionBtn} activeOpacity={0.8}>
-            <Text style={{ fontSize: 24 }}>🖼️</Text>
-          </TouchableOpacity>
+          <View style={styles.pillContainer}>
+            {/* 1. Add Button */}
+            {!isRecording && (
+              <TouchableOpacity style={styles.pillImageBtn} onPress={handlePickImage} activeOpacity={0.7}>
+                <Ionicons name="add" size={24} color={th.textColor} />
+              </TouchableOpacity>
+            )}
 
-          <TextInput
-            style={[styles.input, { color: th.textColor }]}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Share a thought..."
-            placeholderTextColor={th.textColor + '80'}
-            multiline
-            onKeyPress={(e) => {
-              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter') {
-                // @ts-ignore
-                if (!e.nativeEvent.shiftKey) { e.preventDefault(); handleSend(); }
-              }
-            }}
-          />
+            {/* 2. Text Input / Recording Center */}
+            <View style={styles.pillCenter}>
+              {isRecording ? (
+                <View style={styles.pillRecordingInfo}>
+                   <View style={styles.recordDot} />
+                   <Text style={[styles.recordTime, { color: th.textColor }]}>{Math.floor(recordDuration / 60)}:{String(recordDuration % 60).padStart(2, '0')}</Text>
+                   <Animated.View style={{ transform: [{ translateX: slideX }], marginLeft: 20 }}>
+                      <Text style={styles.slideCancelText}>‹ SLIDE TO CANCEL</Text>
+                   </Animated.View>
+                </View>
+              ) : (
+                <TextInput
+                  style={[styles.input, { color: th.textColor }]}
+                  value={inputText}
+                  placeholder="Share a thought..."
+                  placeholderTextColor="#999"
+                  multiline
+                  onChangeText={setInputText}
+                />
+              )}
+            </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <TouchableOpacity style={styles.inputSecondaryBtn}>
-              <Text style={{ fontSize: 20, opacity: 0.6 }}>😊</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity
-              style={[styles.sendBtn, (!inputText.trim() || sending) && { opacity: 0.5 }]}
-              onPress={handleSend}
-              disabled={!inputText.trim() || sending}
-            >
-              <LinearGradient
-                colors={[th.myBubbleColor, th.myBubbleColor + 'CC']}
-                style={styles.sendBtnGrad}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.sendIcon}>➔</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+            {/* 3. Actions (Mic/Send/Emoji) */}
+            <View style={styles.pillActions}>
+              {!inputText.trim() && !isRecording && (
+                <TouchableOpacity style={styles.pillSmallBtn}>
+                  <Feather name="smile" size={20} color="#666" />
+                </TouchableOpacity>
+              )}
+
+              {inputText.trim() ? (
+                <TouchableOpacity style={styles.pillSendBtn} onPress={() => handleSend()}>
+                   <Ionicons name="arrow-forward" size={22} color="#FFF" />
+                </TouchableOpacity>
+              ) : (
+                <PanGestureHandler
+                  onGestureEvent={(e) => {
+                    const x = e.nativeEvent.translationX;
+                    if (x < 0) slideX.setValue(x);
+                  }}
+                  onHandlerStateChange={(e) => {
+                    if (e.nativeEvent.state === 2) startRecording();
+                    else if (e.nativeEvent.state === 5) {
+                      const shouldCancel = e.nativeEvent.translationX < -100;
+                      stopRecording(shouldCancel);
+                      Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
+                    }
+                  }}
+                >
+                  <Animated.View style={[styles.pillMicBtn, isRecording && { transform: [{ scale: 1.25 }], backgroundColor: '#9B3D2C' }]}>
+                    <Ionicons name="mic-outline" size={24} color={isRecording ? '#FFF' : '#666'} />
+                  </Animated.View>
+                </PanGestureHandler>
+              )}
+            </View>
           </View>
         </View>
-      </View>
     </KeyboardAvoidingView>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F5ECD7' },
+  root: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    borderBottomWidth: 1.5,
-    borderBottomColor: '#D9BC8A',
-    backgroundColor: 'transparent', // Using BlurView
+    zIndex: 10,
   },
-  backBtn: { marginRight: 8, padding: 8 },
-  backText: { fontSize: 24, fontWeight: '600', color: '#8C6246' },
+  backBtn: { marginRight: 8, padding: 4 },
   headerInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerAvatarContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    padding: 3,
-    borderWidth: 2,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    padding: 2,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerAvatar: {
     width: '100%',
     height: '100%',
-    borderRadius: 27,
+    borderRadius: 22,
   },
-  headerAvatarText: { fontSize: 22, fontWeight: '800', color: '#FDFAF4' },
-  headerTitle: { fontSize: 19, fontWeight: '800', color: '#3D2B1F' },
-  headerStatus: { fontSize: 10, fontWeight: '700', color: '#8C6246', letterSpacing: 1, textTransform: 'uppercase', opacity: 0.8 },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerActionBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#EDD9B8', justifyContent: 'center', alignItems: 'center' },
-  onlineIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#B5947A', borderWidth: 2, borderColor: '#F5ECD7' },
+  headerAvatarText: { fontSize: 18, fontWeight: '800', color: '#FFF' },
+  headerTitle: { fontSize: 17, fontWeight: '800', marginBottom: 2 },
+  headerStatus: { fontSize: 9, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  headerActions: { flexDirection: 'row', gap: 6 },
+  headerActionBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: 'rgba(0,0,0,0.03)', justifyContent: 'center', alignItems: 'center' },
+  onlineIndicator: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#BDBDBD', borderWidth: 2, borderColor: '#FFF' },
   onlineIndicatorActive: { backgroundColor: '#4CAF50' },
-
-  // List
-  listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 12 },
   
-  // Bubbles
-  bubbleWrap: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
-  bubbleMeWrap: { justifyContent: 'flex-end' },
-  bubbleThemWrap: { justifyContent: 'flex-start' },
+  listContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 120, gap: 10 },
   
-  bubbleMeta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, marginLeft: 4 },
-  bubbleMetaMe: { alignSelf: 'flex-end', marginRight: 4 },
-  bubbleName: { fontSize: 12, fontWeight: '800', color: '#8C6246', textTransform: 'uppercase', letterSpacing: 1 },
-  bubbleTime: { fontSize: 10, color: '#B5947A' },
-
-  bubble: {
-    maxWidth: '100%',
-    padding: 20,
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.06,
-    shadowRadius: 16,
-    elevation: 4,
-    borderRadius: 24,
+  // Footer & Input Pill
+  footerContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.03)',
   },
-  bubbleMe: {
-    borderBottomRightRadius: 8,
-  },
-  bubbleThem: {
-    borderBottomLeftRadius: 8,
-  },
-  bubbleText: { fontSize: 16, lineHeight: 24, color: '#3D2B1F' },
-  bubbleMeText: { color: '#FDFAF4' },
-
-  // Input Area Wrapper
-  inputAreaWrapper: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    paddingHorizontal: 20,
-    backgroundColor: 'transparent'
-  },
-  inputFloatContainer: {
-    padding: 8,
-    borderRadius: 40,
+  pillContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 30,
-    elevation: 10,
-    borderWidth: 1,
-  },
-  replyBanner: { 
-    marginBottom: 8, 
-    padding: 12, 
-    borderRadius: 20, 
-    flexDirection: 'row', 
-    alignItems: 'center',
-    borderLeftWidth: 4,
+    padding: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2
+    shadowRadius: 12,
+    elevation: 4,
   },
-  replyBannerContent: { flex: 1, paddingLeft: 12 },
-  replyBannerLabel: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', marginBottom: 2 },
-  replyBannerSnippet: { fontSize: 13, color: '#8C6246', opacity: 0.8 },
-  replyBannerClose: { padding: 8 },
-
-  input: {
+  pillImageBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillCenter: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
+  },
+  input: {
     fontSize: 16,
     maxHeight: 120,
+    paddingVertical: 10,
   },
-  inputActionBtn: {
+  pillActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingRight: 4,
+  },
+  pillSmallBtn: {
+    padding: 10,
+  },
+  pillMicBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#D3FBDA',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  inputSecondaryBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtn: {
+  pillSendBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    overflow: 'hidden',
-  },
-  sendBtnGrad: {
-    flex: 1,
+    backgroundColor: '#007AFF', // Clean blue for send from Ref 4
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
-  sendIcon: { fontSize: 18, color: '#FDFAF4', fontWeight: '800' },
+  pillRecordingInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  recordDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF3B30',
+    marginRight: 10,
+  },
+  recordTime: {
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  slideCancelText: {
+    color: '#999',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
 
-  // Interactive UI Styles
-  replyBannerCloseText: { fontSize: 18, color: '#8C6246', fontWeight: 'bold' },
-
-  pinnedBanner: { flexDirection: 'row', backgroundColor: '#FDFAF4', borderBottomWidth: 1.5, borderBottomColor: '#D9BC8A', paddingHorizontal: 20, paddingVertical: 12, alignItems: 'center', gap: 12 },
-  pinnedIcon: { fontSize: 18 },
-  pinnedLabel: { fontSize: 11, fontWeight: '700', color: '#C9705A', textTransform: 'uppercase' },
-  pinnedText: { fontSize: 13, color: '#3D2B1F', fontWeight: '500' },
-
-  contextBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(26, 21, 19, 0.4)' },
-  contextMenu: { position: 'absolute', right: 40, width: 250, backgroundColor: '#FDFAF4', borderRadius: 20, padding: 8, shadowColor: '#000', shadowOffset: { height: 10, width: 0 }, shadowOpacity: 0.2, shadowRadius: 20, elevation: 15 },
-  contextHeader: { fontSize: 12, fontWeight: '700', color: '#C5A870', textAlign: 'center', paddingTop: 12, paddingBottom: 8, textTransform: 'uppercase' },
-  contextButtonGroup: { backgroundColor: '#F5ECD7', borderRadius: 12, overflow: 'hidden' },
-  contextButton: { paddingVertical: 16, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EDD9B8' },
-  contextButtonText: { fontSize: 16, fontWeight: '600', color: '#C9705A' },
-  contextSnippet: { fontSize: 14, color: '#8C6246', textAlign: 'center', paddingHorizontal: 16, paddingBottom: 16, fontStyle: 'italic' },
+  // Message Bubbles
+  bubbleWrap: { flexDirection: 'row', marginBottom: 16 },
+  bubbleMeWrap: { justifyContent: 'flex-end' },
+  bubbleThemWrap: { justifyContent: 'flex-start' },
   
-  systemBubbleWrap: { alignItems: 'center', marginVertical: 16 },
-  systemBubble: { backgroundColor: '#EDD9B8', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  systemBubbleText: { fontSize: 12, fontWeight: '700', color: '#8C6246', textAlign: 'center' },
+  bubbleMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, paddingHorizontal: 4 },
+  bubbleMetaMe: { alignSelf: 'flex-end' },
+  bubbleName: { fontSize: 10, fontWeight: '800', color: '#888', textTransform: 'uppercase' },
+  bubbleTime: { fontSize: 9, color: '#BBB' },
 
-  milestoneContainer: { alignItems: 'center', marginVertical: 32, paddingHorizontal: 40 },
-  milestoneIconBox: { width: 80, height: 80, backgroundColor: '#EDD9B8', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12, transform: [{ rotate: '3deg' }] },
-  milestoneTitle: { fontSize: 18, fontWeight: '800', color: '#3D2B1F', marginBottom: 4 },
-  milestoneDesc: { fontSize: 13, color: '#8C6246', textAlign: 'center', opacity: 0.8 },
+  bubble: {
+    maxWidth: '85%',
+    padding: 14,
+    borderRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  bubbleMe: {
+    backgroundColor: '#9B3D2C',
+    borderBottomRightRadius: 4, // Tail effect
+  },
+  bubbleThem: {
+    backgroundColor: '#FFFFFF',
+    borderBottomLeftRadius: 4, // Tail effect
+  },
+  bubbleText: { fontSize: 15, lineHeight: 22 },
+  bubbleImageContainer: { padding: 4 },
+  bubbleImage: { width: 220, height: 160, borderRadius: 14 },
 
-  // Interactive UI Styles
-  bubbleReplyInner: { backgroundColor: 'rgba(255,255,255,0.25)', padding: 12, borderRadius: 16, marginBottom: 8 },
-  bubbleReplyName: { fontSize: 11, fontWeight: '800', color: '#FDFAF4', marginBottom: 2 },
-  bubbleReplyText: { fontSize: 13, color: '#FDFAF4', opacity: 0.9 },
+  // Secondary UI
+  replyBanner: { 
+    marginBottom: 8, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderRadius: 16, 
+    padding: 12,
+    borderLeftWidth: 4,
+  },
+  replyBannerContent: { flex: 1, paddingLeft: 8 },
+  replyBannerLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5, marginBottom: 2 },
+  replyBannerSnippet: { fontSize: 13, opacity: 0.6 },
+  replyBannerClose: { padding: 4 },
+
+  pinnedBanner: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    padding: 10, 
+    paddingHorizontal: 16, 
+    backgroundColor: '#FFF',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.03)',
+  },
+  pinnedLabel: { fontSize: 9, fontWeight: '800', textTransform: 'uppercase', opacity: 0.4 },
+  pinnedText: { fontSize: 13, fontWeight: '600', marginLeft: 8 },
+
+  contextBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
+  contextMenu: { position: 'absolute', width: 200, borderRadius: 20, padding: 6, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.15, shadowRadius: 16 },
+  contextHeader: { fontSize: 10, fontWeight: '800', textAlign: 'center', paddingVertical: 8, opacity: 0.4, textTransform: 'uppercase' },
+  contextSnippet: { fontSize: 12, textAlign: 'center', paddingBottom: 10, opacity: 0.6 },
+  contextButtonGroup: { borderRadius: 14, overflow: 'hidden' },
+  contextButton: { paddingVertical: 12, alignItems: 'center', borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.03)' },
+  contextButtonText: { fontSize: 15, fontWeight: '600' },
+
+  systemBubbleWrap: { alignItems: 'center', marginVertical: 14 },
+  systemBubble: { paddingHorizontal: 14, paddingVertical: 4, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.03)' },
+  systemBubbleText: { fontSize: 10, fontWeight: '700', opacity: 0.4, textTransform: 'uppercase' },
+
+  milestoneContainer: { alignItems: 'center', marginVertical: 20 },
+  milestoneIconBox: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 8, backgroundColor: '#F9F9F9' },
+  milestoneTitle: { fontSize: 16, fontWeight: '800', color: '#1A1A1A' },
+  milestoneDesc: { fontSize: 12, textAlign: 'center', opacity: 0.6 },
+
+  bubbleReplyInner: { padding: 8, borderRadius: 10, marginBottom: 6, backgroundColor: 'rgba(0,0,0,0.03)' },
+  bubbleReplyName: { fontSize: 10, fontWeight: '800', marginBottom: 1 },
+  bubbleReplyText: { fontSize: 11, opacity: 0.7 },
+  
+  audioBubbleContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 180 },
+  playBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
+  audioMeta: { flex: 1, gap: 4 },
+  track: { height: 3, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 2 },
+  progress: { height: '100%' },
+  audioTime: { fontSize: 9, fontWeight: '800' },
 });
