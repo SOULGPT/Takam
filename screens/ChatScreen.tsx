@@ -115,15 +115,27 @@ export default function ChatScreen() {
   // Context Menu State
   const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
+  const [recordingPreviewUri, setRecordingPreviewUri] = useState<string | null>(null);
+  const [isRecordingLocked, setIsRecordingLocked] = useState(false);
+  const [previewPlaying, setPreviewPlaying] = useState(false);
+  const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
+  
+  const slideX = useRef(new Animated.Value(0)).current;
+  const slideY = useRef(new Animated.Value(0)).current;
+  const lockAnim = useRef(new Animated.Value(0)).current; 
+
+  // Cleanup preview sound
+  useEffect(() => {
+    return () => { if (previewSound) previewSound.unloadAsync(); };
+  }, [previewSound]);
   
   // Media State
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordDuration, setRecordDuration] = useState(0);
   const recordInterval = useRef<any>(null);
-  const slideX = useRef(new Animated.Value(0)).current; // For slide to cancel
 
   // Theme State
   const [themePickerVisible, setThemePickerVisible] = useState(false);
@@ -357,23 +369,85 @@ export default function ChatScreen() {
     }
   };
 
-  const stopRecording = async (shouldCancel: boolean) => {
-    if (!recording) return;
-
-    setIsRecording(false);
-    clearInterval(recordInterval.current);
+  const stopRecording = async (shouldCancel: boolean = false, andPreview: boolean = false) => {
     try {
+      if (!recording) return;
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setRecording(null);
+      setIsRecording(false);
+      setIsRecordingLocked(false);
+      if (recordInterval.current) clearInterval(recordInterval.current);
 
-      if (!shouldCancel && uri) {
+      if (shouldCancel) {
+        if (uri) await FileSystem.deleteAsync(uri).catch(() => {});
+        return;
+      }
+
+      if (andPreview && uri) {
+        setRecordingPreviewUri(uri);
+        return;
+      }
+
+      if (uri) {
         const url = await uploadFile(uri, 'audio');
         if (url) handleSend(undefined, url, 'audio');
+        playSound('voice_sent');
       }
-    } catch (e) {
-      console.error('Record stop error:', e);
+    } catch (err) {
+      console.error('Stop recording error', err);
     }
+  };
+
+  const handlePreviewPlay = async () => {
+    if (!recordingPreviewUri) return;
+    if (previewPlaying && previewSound) {
+      await previewSound.pauseAsync();
+      setPreviewPlaying(false);
+      return;
+    }
+    
+    if (previewSound) {
+      await previewSound.playAsync();
+      setPreviewPlaying(true);
+    } else {
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: recordingPreviewUri },
+        { shouldPlay: true },
+        (status: any) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setPreviewPlaying(false);
+            sound.setPositionAsync(0);
+          }
+        }
+      );
+      setPreviewSound(sound);
+      setPreviewPlaying(true);
+    }
+  };
+
+  const handleSendPreview = async () => {
+    if (!recordingPreviewUri) return;
+    const uri = recordingPreviewUri;
+    setRecordingPreviewUri(null);
+    if (previewSound) {
+      await previewSound.unloadAsync();
+      setPreviewSound(null);
+    }
+    const url = await uploadFile(uri, 'audio');
+    if (url) handleSend(undefined, url, 'audio');
+    playSound('voice_sent');
+  };
+
+  const handleDiscardPreview = async () => {
+    if (!recordingPreviewUri) return;
+    const uri = recordingPreviewUri;
+    setRecordingPreviewUri(null);
+    if (previewSound) {
+      await previewSound.unloadAsync();
+      setPreviewSound(null);
+    }
+    await FileSystem.deleteAsync(uri).catch(() => {});
   };
 
   // ── 4. Send Message ─────────────────────────────────────────────────────────
@@ -669,7 +743,7 @@ export default function ChatScreen() {
 
         {/* ── Ref 4 Ultra-Clean Footer (Solid Background) ── */}
         <View style={[styles.footerContainer, { backgroundColor: th.bgColors[2], paddingBottom: insets.bottom + 8 }]}>
-          {replyTarget && (
+          {replyTarget && !isRecording && !recordingPreviewUri && (
             <View style={[styles.replyBanner, { backgroundColor: '#FFF', borderLeftColor: th.myBubbleColor }]}>
                <View style={styles.replyBannerContent}>
                   <Text style={[styles.replyBannerLabel, { color: th.myBubbleColor }]}>REPLYING TO {replyTarget.sender_id === session?.user?.id ? 'YOU' : partnerName.toUpperCase()}</Text>
@@ -681,70 +755,131 @@ export default function ChatScreen() {
             </View>
           )}
 
-          <View style={styles.pillContainer}>
-            {/* 1. Add Button */}
-            {!isRecording && (
-              <TouchableOpacity style={styles.pillImageBtn} onPress={handlePickImage} activeOpacity={0.7}>
-                <Ionicons name="add" size={24} color={th.textColor} />
+          {/* ── Preview Mode ── */}
+          {recordingPreviewUri ? (
+            <View style={styles.previewPill}>
+              <TouchableOpacity style={styles.discardBtn} onPress={handleDiscardPreview}>
+                <Ionicons name="trash-outline" size={22} color="#FF3B30" />
               </TouchableOpacity>
-            )}
+              
+              <View style={styles.previewCenter}>
+                <TouchableOpacity onPress={handlePreviewPlay} style={styles.previewPlayBtn}>
+                  <Ionicons name={previewPlaying ? "pause" : "play"} size={24} color={th.myBubbleColor} />
+                </TouchableOpacity>
+                <Text style={styles.previewText}>Recording Ready</Text>
+              </View>
 
-            {/* 2. Text Input / Recording Center */}
-            <View style={styles.pillCenter}>
-              {isRecording ? (
-                <View style={styles.pillRecordingInfo}>
-                   <View style={styles.recordDot} />
-                   <Text style={[styles.recordTime, { color: th.textColor }]}>{Math.floor(recordDuration / 60)}:{String(recordDuration % 60).padStart(2, '0')}</Text>
-                   <Animated.View style={{ transform: [{ translateX: slideX }], marginLeft: 20 }}>
-                      <Text style={styles.slideCancelText}>‹ SLIDE TO CANCEL</Text>
-                   </Animated.View>
-                </View>
-              ) : (
-                <TextInput
-                  style={[styles.input, { color: th.textColor }]}
-                  value={inputText}
-                  placeholder="Share a thought..."
-                  placeholderTextColor="#999"
-                  multiline
-                  onChangeText={setInputText}
-                />
-              )}
+              <TouchableOpacity style={styles.previewSendBtn} onPress={handleSendPreview}>
+                <Ionicons name="send" size={20} color="#FFF" />
+              </TouchableOpacity>
             </View>
-
-            {/* 3. Actions (Mic/Send/Emoji) */}
-            <View style={styles.pillActions}>
-              {!inputText.trim() && !isRecording && (
-                <TouchableOpacity style={styles.pillSmallBtn}>
-                  <Feather name="smile" size={20} color="#666" />
+          ) : (
+            <View style={styles.pillContainer}>
+              {/* 1. Add Button */}
+              {!isRecording && (
+                <TouchableOpacity style={styles.pillImageBtn} onPress={handlePickImage} activeOpacity={0.7}>
+                  <Ionicons name="add" size={24} color={th.textColor} />
                 </TouchableOpacity>
               )}
 
-              {inputText.trim() ? (
-                <TouchableOpacity style={styles.pillSendBtn} onPress={() => handleSend()}>
-                   <Ionicons name="arrow-forward" size={22} color="#FFF" />
-                </TouchableOpacity>
-              ) : (
-                <PanGestureHandler
-                  onGestureEvent={(e) => {
-                    const x = e.nativeEvent.translationX;
-                    if (x < 0) slideX.setValue(x);
-                  }}
-                  onHandlerStateChange={(e) => {
-                    if (e.nativeEvent.state === 2) startRecording();
-                    else if (e.nativeEvent.state === 5) {
-                      const shouldCancel = e.nativeEvent.translationX < -100;
-                      stopRecording(shouldCancel);
-                      Animated.spring(slideX, { toValue: 0, useNativeDriver: true }).start();
-                    }
-                  }}
-                >
-                  <Animated.View style={[styles.pillMicBtn, isRecording && { transform: [{ scale: 1.25 }], backgroundColor: '#9B3D2C' }]}>
-                    <Ionicons name="mic-outline" size={24} color={isRecording ? '#FFF' : '#666'} />
-                  </Animated.View>
-                </PanGestureHandler>
-              )}
+              {/* 2. Text Input / Recording Center */}
+              <View style={styles.pillCenter}>
+                {isRecording ? (
+                  <View style={styles.pillRecordingInfo}>
+                     <View style={styles.recordDot} />
+                     <Text style={[styles.recordTime, { color: th.textColor }]}>{Math.floor(recordDuration / 60)}:{String(recordDuration % 60).padStart(2, '0')}</Text>
+                     
+                     {!isRecordingLocked ? (
+                       <Animated.View style={{ transform: [{ translateX: slideX }], marginLeft: 20 }}>
+                          <Text style={styles.slideCancelText}>‹ SLIDE TO CANCEL</Text>
+                       </Animated.View>
+                     ) : (
+                       <Text style={[styles.slideCancelText, { marginLeft: 20, color: '#FF3B30' }]}>RECORDING LOCKED</Text>
+                     )}
+                  </View>
+                ) : (
+                  <TextInput
+                    style={[styles.input, { color: th.textColor }]}
+                    value={inputText}
+                    placeholder="Share a thought..."
+                    placeholderTextColor="#999"
+                    multiline
+                    onChangeText={setInputText}
+                  />
+                )}
+              </View>
+
+              {/* 3. Actions (Mic/Send/Emoji) */}
+              <View style={styles.pillActions}>
+                {isRecordingLocked ? (
+                   <TouchableOpacity style={styles.pillStopBtn} onPress={() => stopRecording(false, true)}>
+                      <Ionicons name="stop" size={20} color="#FF3B30" />
+                   </TouchableOpacity>
+                ) : (
+                  <>
+                    {!inputText.trim() && !isRecording && (
+                      <TouchableOpacity style={styles.pillSmallBtn}>
+                        <Feather name="smile" size={20} color="#666" />
+                      </TouchableOpacity>
+                    )}
+
+                    {inputText.trim() ? (
+                      <TouchableOpacity style={styles.pillSendBtn} onPress={() => handleSend()}>
+                         <Ionicons name="arrow-forward" size={22} color="#FFF" />
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={{ alignItems: 'center' }}>
+                         {/* Lock Icon Animation */}
+                         {isRecording && (
+                           <Animated.View style={{ position: 'absolute', top: -60, opacity: Animated.divide(Animated.multiply(slideY, -1), 80) }}>
+                              <Ionicons name="lock-closed" size={24} color={th.myBubbleColor} />
+                           </Animated.View>
+                         )}
+
+                         <PanGestureHandler
+                          onGestureEvent={(e) => {
+                            const x = e.nativeEvent.translationX;
+                            const y = e.nativeEvent.translationY;
+                            if (x < 0) slideX.setValue(x);
+                            if (y < 0) slideY.setValue(y);
+                            
+                            // Check Lock
+                            if (y < -80 && !isRecordingLocked) {
+                              setIsRecordingLocked(true);
+                              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                              Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+                            }
+                          }}
+                          onHandlerStateChange={(e) => {
+                            if (e.nativeEvent.state === 2) {
+                              startRecording();
+                            } else if (e.nativeEvent.state === 5) {
+                              if (isRecordingLocked) return; // Keep recording
+                              
+                              const shouldCancel = e.nativeEvent.translationX < -100;
+                              stopRecording(shouldCancel);
+                              Animated.parallel([
+                                Animated.spring(slideX, { toValue: 0, useNativeDriver: true }),
+                                Animated.spring(slideY, { toValue: 0, useNativeDriver: true }),
+                              ]).start();
+                            }
+                          }}
+                        >
+                          <Animated.View style={[
+                            styles.pillMicBtn, 
+                            isRecording && { transform: [{ scale: 1.25 }], backgroundColor: '#9B3D2C' },
+                            { transform: [{ translateY: slideY }] }
+                          ]}>
+                            <Ionicons name="mic-outline" size={24} color={isRecording ? '#FFF' : '#666'} />
+                          </Animated.View>
+                        </PanGestureHandler>
+                      </View>
+                    )}
+                  </>
+                )}
+              </View>
             </View>
-          </View>
+          )}
         </View>
     </KeyboardAvoidingView>
     </GestureHandlerRootView>
@@ -961,4 +1096,22 @@ const styles = StyleSheet.create({
   track: { height: 3, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 2 },
   progress: { height: '100%' },
   audioTime: { fontSize: 9, fontWeight: '800' },
+  previewPill: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  discardBtn: { padding: 10 },
+  previewCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  previewPlayBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(0,0,0,0.05)', justifyContent: 'center', alignItems: 'center' },
+  previewText: { fontSize: 14, fontWeight: '700', color: '#666' },
+  previewSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center' },
+  pillStopBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,59,48,0.1)', justifyContent: 'center', alignItems: 'center' },
 });

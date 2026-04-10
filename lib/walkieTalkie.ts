@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import { supabase } from './supabase';
 import * as FileSystem from 'expo-file-system';
 
@@ -14,6 +14,11 @@ export const startRecording = async () => {
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
+      staysActiveInBackground: true,
+      interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
+      playThroughEarpieceAndroid: false,
     });
 
     const { recording: newRecording } = await Audio.Recording.createAsync(
@@ -36,7 +41,9 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
 
     if (!uri) throw new Error('No recording URI found');
 
-    // Convert to base64 for upload
+    // Slight delay to ensure filesystem is ready
+    await new Promise(r => setTimeout(r, 100));
+
     const base64 = await FileSystem.readAsStringAsync(uri, {
       encoding: 'base64',
     });
@@ -48,6 +55,7 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
       .from('walkie-bursts')
       .upload(filePath, decode(base64), {
         contentType: 'audio/m4a',
+        upsert: true
       });
 
     if (error) throw error;
@@ -65,16 +73,21 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
 
 export const playBurst = async (url: string, onFinish?: () => void) => {
   try {
+    // We don't strictly NEED to disable allowsRecordingIOS here, 
+    // keeping it enabled prevents the entire audio engine from restarting
     await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
+      allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
       staysActiveInBackground: true,
+      interruptionModeIOS: InterruptionModeIOS.DuckOthers,
+      shouldDuckAndroid: true,
+      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
       playThroughEarpieceAndroid: false,
     });
 
     const { sound } = await Audio.Sound.createAsync(
       { uri: url },
-      { shouldPlay: true }
+      { shouldPlay: true, volume: 1.0 }
     );
 
     sound.setOnPlaybackStatusUpdate((status) => {

@@ -380,7 +380,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
 
       <ScrollView
         contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps="always"
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -415,7 +415,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
           )}
 
           {!isLastStep ? (
-            <TouchableOpacity style={styles.nextBtn} onPress={goNext} activeOpacity={0.87}>
+            <TouchableOpacity 
+              style={styles.nextBtn} 
+              onPress={goNext} 
+              activeOpacity={0.87}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
               <LinearGradient
                 colors={['#D97B60', '#C9705A', '#A8503E']}
                 style={styles.nextGrad}
@@ -431,6 +436,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
               onPress={handleFinish}
               disabled={loading || !termsAccepted}
               activeOpacity={0.87}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <LinearGradient
                 colors={
