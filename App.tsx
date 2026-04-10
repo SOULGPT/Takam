@@ -16,12 +16,10 @@ import UpgradeScreen from './screens/UpgradeScreen';
 const RootStack = createNativeStackNavigator();
 
 // ── Auth-flow state machine ──────────────────────────────────────────────────
-// 'landing'    → unauthenticated, show the landing page
-// 'signup'     → user tapped "Start Your Bond" from landing → AuthScreen sign-up mode
-// 'signin'     → user tapped "Sign In" from landing → AuthScreen sign-in mode
+// 'reset'      → user clicked forgot-password link in email → AuthScreen reset mode
 // 'onboarding' → just signed up, profile incomplete → OnboardingScreen
 // null         → authenticated + profile complete → show main TabNavigator
-type AuthFlow = 'landing' | 'signup' | 'signin' | 'onboarding' | null;
+type AuthFlow = 'landing' | 'signup' | 'signin' | 'reset' | 'onboarding' | null;
 
 function AppCore() {
   const {
@@ -192,6 +190,9 @@ function AppCore() {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         setLoading(false);
       }
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthFlow('reset');
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -213,6 +214,9 @@ function AppCore() {
     }
     if (authFlow === 'signin') {
       return <AuthScreen initialMode="signin" onBack={() => setAuthFlow('landing')} />;
+    }
+    if (authFlow === 'reset') {
+      return <AuthScreen initialMode="reset" onBack={() => setAuthFlow('landing')} />;
     }
     return (
       <LandingScreen

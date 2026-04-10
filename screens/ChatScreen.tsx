@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
-import { useStore, BOND_META } from '../store/useStore';
+import { useStore, BOND_META, CHAT_THEMES, ChatThemeOption } from '../store/useStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
 
@@ -36,7 +36,7 @@ type Message = {
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
-  const { session, profile, activeBondId, bonds, bondMembers } = useStore();
+  const { session, profile, activeBondId, bonds, bondMembers, updateBond } = useStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
@@ -48,6 +48,38 @@ export default function ChatScreen() {
   const [contextPos, setContextPos] = useState({ x: 0, y: 0 });
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
+
+  // Theme State
+  const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const activeBond = bonds.find((b) => b.id === activeBondId);
+  const activeBondKey = activeBond?.theme || 'classic';
+  const th = CHAT_THEMES[activeBondKey as ChatThemeOption] || CHAT_THEMES.classic;
+
+  const handleChangeTheme = async (newTheme: ChatThemeOption) => {
+    setThemePickerVisible(false);
+    if (!activeBondId || !session?.user || !activeBond) return;
+    
+    updateBond({ ...activeBond, theme: newTheme }); 
+    await supabase.from('bonds').update({ theme: newTheme }).eq('id', activeBondId);
+    
+    const sysMsg: Message = {
+      id: `sys-${Date.now()}`,
+      sender_id: session.user.id,
+      content: `[TAKAM SYSTEM] @${profile?.username || 'User'} changed the theme to ${CHAT_THEMES[newTheme].name} ✨`,
+      created_at: new Date().toISOString(),
+      is_system: true,
+    };
+    setMessages(prev => [sysMsg, ...prev]);
+
+    await supabase.from('messages').insert({
+      bond_id: activeBondId,
+      sender_id: session.user.id,
+      content: sysMsg.content,
+      is_system: true
+    });
+  };
+
+  const partnerProfile = activeBondId ? bondMembers[activeBondId] : null;
 
   const openContextMenu = (msg: Message, e: any) => {
     const y = e.nativeEvent.pageY;
@@ -103,9 +135,6 @@ export default function ChatScreen() {
   const handleActionReport = () => {
     Alert.alert('Reported', 'This message has been flagged for review by Takam.', [{ text: 'OK', onPress: closeContextMenu }]);
   };
-
-  const activeBond = bonds.find((b) => b.id === activeBondId);
-  const partnerProfile = activeBondId ? bondMembers[activeBondId] : null;
 
   const [isPartnerOnline, setIsPartnerOnline] = useState(partnerProfile?.is_online ?? false);
 
@@ -291,16 +320,16 @@ export default function ChatScreen() {
             activeOpacity={0.8}
             delayLongPress={250}
             onLongPress={(e) => openContextMenu(item, e)}
-            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem]}
+            style={[styles.bubble, isMe ? styles.bubbleMe : styles.bubbleThem, { backgroundColor: isMe ? th.myBubbleColor : th.themBubbleColor, borderColor: th.borderColor }]}
           >
             {parentMsg && (
-              <View style={styles.bubbleReplyInner}>
-                <Text style={styles.bubbleReplyName}>{parentMsg.sender_id === session?.user?.id ? 'You' : partnerName}</Text>
-                <Text style={styles.bubbleReplyText} numberOfLines={1}>{parentMsg.content}</Text>
+              <View style={[styles.bubbleReplyInner, { backgroundColor: isMe ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.05)' }]}>
+                <Text style={[styles.bubbleReplyName, { color: isMe ? th.myBubbleText : th.themBubbleText }]}>{parentMsg.sender_id === session?.user?.id ? 'You' : partnerName}</Text>
+                <Text style={[styles.bubbleReplyText, { color: isMe ? th.myBubbleText : th.themBubbleText }]} numberOfLines={1}>{parentMsg.content}</Text>
               </View>
             )}
-            <Text style={[styles.bubbleText, isMe && styles.bubbleMeText]}>{item.content}</Text>
-            <Text style={[styles.bubbleTime, isMe && styles.bubbleMeTime]}>
+            <Text style={[styles.bubbleText, isMe ? styles.bubbleMeText : null, { color: isMe ? th.myBubbleText : th.themBubbleText }]}>{item.content}</Text>
+            <Text style={[styles.bubbleTime, isMe ? styles.bubbleMeTime : null, { color: isMe ? th.myBubbleText : th.themBubbleText, opacity: 0.7 }]}>
               {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </Text>
           </TouchableOpacity>
@@ -316,28 +345,32 @@ export default function ChatScreen() {
       style={[styles.root, { paddingBottom: insets.bottom }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+      <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
 
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 16, backgroundColor: th.headerBgColor, borderBottomColor: th.borderColor }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => nav.goBack()} hitSlop={20}>
-          <Text style={styles.backText}>←</Text>
+          <Text style={[styles.backText, { color: th.textColor }]}>←</Text>
         </TouchableOpacity>
         
-        <View style={styles.headerInfo}>
+        <View style={[styles.headerInfo, { flex: 1 }]}>
           <View style={[styles.headerAvatar, { backgroundColor: meta.color }]}>
             <Text style={styles.headerAvatarText}>{partnerInitial}</Text>
           </View>
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.headerName}>{partnerName}</Text>
+              <Text style={[styles.headerName, { color: th.textColor }]}>{partnerName}</Text>
               <View style={[styles.onlineDot, isPartnerOnline && styles.onlineDotActive]} />
             </View>
-            <Text style={styles.headerSub}>
+            <Text style={[styles.headerSub, { color: th.textColor, opacity: 0.7 }]}>
               {isPartnerOnline ? '🟢 Online' : '⚪ Offline'} · {meta.emoji} {meta.label} Bond
             </Text>
           </View>
         </View>
+
+        <TouchableOpacity style={{ padding: 8 }} onPress={() => setThemePickerVisible(true)}>
+          <Text style={{ fontSize: 24 }}>🎨</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Pinned Message */}
@@ -403,6 +436,29 @@ export default function ChatScreen() {
         </View>
       </Modal>
 
+      {/* Theme Picker Modal */}
+      <Modal visible={themePickerVisible} animationType="slide" transparent onRequestClose={() => setThemePickerVisible(false)}>
+         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+            <View style={{ backgroundColor: th.headerBgColor, padding: 24, paddingBottom: insets.bottom + 24, borderTopLeftRadius: 32, borderTopRightRadius: 32 }}>
+               <Text style={{ fontSize: 18, fontWeight: '800', textAlign: 'center', marginBottom: 20, color: th.textColor }}>Select Chat Theme</Text>
+               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center' }}>
+                  {(Object.keys(CHAT_THEMES) as ChatThemeOption[]).map(key => {
+                    const themeObj = CHAT_THEMES[key];
+                    return (
+                       <TouchableOpacity key={key} onPress={() => handleChangeTheme(key)} style={{ width: 80, alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                          <LinearGradient colors={themeObj.bgColors} style={{ width: 50, height: 50, borderRadius: 25, borderWidth: 2, borderColor: activeBondKey === key ? '#C9705A' : th.borderColor }} />
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: th.textColor }}>{themeObj.name}</Text>
+                       </TouchableOpacity>
+                    );
+                  })}
+               </View>
+               <TouchableOpacity onPress={() => setThemePickerVisible(false)} style={{ marginTop: 24, padding: 16, backgroundColor: th.inputBgColor, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: th.borderColor }}>
+                 <Text style={{ fontWeight: '700', color: th.textColor }}>Cancel</Text>
+               </TouchableOpacity>
+            </View>
+         </View>
+      </Modal>
+
       {/* Input Area Group */}
       <View style={styles.inputAreaWrapper}>
         {replyTarget && (
@@ -416,13 +472,13 @@ export default function ChatScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.inputArea}>
+        <View style={[styles.inputArea, { backgroundColor: th.headerBgColor, borderTopColor: th.borderColor }]}>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { backgroundColor: th.inputBgColor, color: th.inputTextColor, borderColor: th.borderColor }]}
             value={inputText}
             onChangeText={setInputText}
             placeholder="Message..."
-            placeholderTextColor="#C5A870"
+            placeholderTextColor={th.textColor}
             multiline
             maxLength={1000}
             onKeyPress={(e) => {

@@ -23,19 +23,21 @@ const { height } = Dimensions.get('window');
 // AuthScreen can be launched in two modes from the Landing screen:
 //  — 'signup'  → opens directly on the email sign-up form
 //  — 'signin'  → opens directly on the email sign-in form
+//  — 'reset'   → opens directly on the password reset form
 //  — undefined → shows the main provider-selection screen
 export interface AuthScreenProps {
-  initialMode?: 'signup' | 'signin';
+  initialMode?: 'signup' | 'signin' | 'reset';
   onBack?: () => void;
 }
 
-type ScreenMode = 'main' | 'email';
+type ScreenMode = 'main' | 'email' | 'forgot' | 'reset';
 
 export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
   const [loading, setLoading] = useState<'google' | 'apple' | 'email' | null>(null);
-  const [screenMode, setScreenMode] = useState<ScreenMode>(
-    initialMode ? 'email' : 'main',
-  );
+  const [screenMode, setScreenMode] = useState<ScreenMode>(() => {
+    if (initialMode === 'reset') return 'reset';
+    return initialMode ? 'email' : 'main';
+  });
   const [isSignUp, setIsSignUp] = useState(initialMode === 'signup');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -104,8 +106,52 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
     }
   };
 
+  // ── Forgot Password ───────────────────────────────────────────────────────
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      Alert.alert('Email Required', 'Please enter your email address first.');
+      return;
+    }
+    setLoading('email');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: 'takam://reset-password',
+      });
+      if (error) throw error;
+      Alert.alert('Reset Email Sent ✉️', 'Check your inbox for the reset link.');
+      setScreenMode('main');
+    } catch (e: any) {
+      Alert.alert('Request Failed', e.message ?? 'Try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // ── Reset Password (Update) ───────────────────────────────────────────────
+  const handleResetPassword = async () => {
+    if (password.length < 6) {
+      Alert.alert('Invalid Password', 'New password must be at least 6 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert('Mismatch', 'Passwords do not match.');
+      return;
+    }
+    setLoading('email');
+    try {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+      Alert.alert('Success ✨', 'Your password has been updated. You are now signed in.');
+      // Session updates automatically, App.tsx will handle navigation
+    } catch (e: any) {
+      Alert.alert('Update Failed', e.message ?? 'Try again.');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   const handleBack = () => {
-    if (screenMode === 'email') {
+    if (screenMode === 'email' || screenMode === 'forgot') {
       if (initialMode) {
         // Came from landing — go all the way back
         onBack?.();
@@ -213,6 +259,13 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
               <Text style={styles.emailButtonText}>✉️  Continue with Email</Text>
             </TouchableOpacity>
 
+            <TouchableOpacity
+              onPress={() => setScreenMode('forgot')}
+              style={styles.forgotMainRow}
+            >
+              <Text style={styles.forgotMainText}>Forgot Password?</Text>
+            </TouchableOpacity>
+
             <Text style={styles.disclaimer}>
               By continuing, you agree to our Terms & Privacy Policy.{'\n'}
               Your bond is private and encrypted.
@@ -223,7 +276,7 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
     );
   }
 
-  // ── Email sign-in / sign-up screen ────────────────────────────────────────
+  // ── Email / Forgot / Reset screen ────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.root}
@@ -261,44 +314,58 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
         </View>
 
         <Text style={styles.emailTitle}>
-          {isSignUp ? 'Create Account' : 'Welcome Back'}
+          {screenMode === 'forgot'
+            ? 'Reset Password'
+            : screenMode === 'reset'
+            ? 'New Password'
+            : isSignUp
+            ? 'Create Account'
+            : 'Welcome Back'}
         </Text>
         <Text style={styles.emailSubtitle}>
-          {isSignUp
+          {screenMode === 'forgot'
+            ? "Enter your email and we'll send a reset link."
+            : screenMode === 'reset'
+            ? 'Type a new secure password for your account.'
+            : isSignUp
             ? 'Sign up to start your private bond.'
             : 'Sign in to return to your bond.'}
         </Text>
 
-        {/* Email input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor="#B5947A"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </View>
+        {/* Form Fields */}
+        {(screenMode === 'email' || screenMode === 'forgot') && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor="#B5947A"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </View>
+        )}
 
-        {/* Password input */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="min. 6 characters"
-            placeholderTextColor="#B5947A"
-            secureTextEntry
-          />
-        </View>
+        {(screenMode === 'email' || screenMode === 'reset') && (
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>
+              {screenMode === 'reset' ? 'New Password' : 'Password'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="min. 6 characters"
+              placeholderTextColor="#B5947A"
+              secureTextEntry
+            />
+          </View>
+        )}
 
-        {/* Confirm password — sign-up only */}
-        {isSignUp && (
+        {(isSignUp || screenMode === 'reset') && (
           <View style={styles.inputGroup}>
             <Text style={styles.inputLabel}>Confirm Password</Text>
             <TextInput
@@ -312,13 +379,28 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
           </View>
         )}
 
+        {screenMode === 'email' && !isSignUp && (
+          <TouchableOpacity
+            onPress={() => setScreenMode('forgot')}
+            style={styles.forgotEmailRow}
+          >
+            <Text style={styles.forgotEmailText}>Forgot Password?</Text>
+          </TouchableOpacity>
+        )}
+
         {/* Submit */}
         <TouchableOpacity
           style={[
             styles.submitButton,
             loading === 'email' && styles.submitButtonDisabled,
           ]}
-          onPress={handleEmailAuth}
+          onPress={
+            screenMode === 'forgot'
+              ? handleForgotPassword
+              : screenMode === 'reset'
+              ? handleResetPassword
+              : handleEmailAuth
+          }
           disabled={loading === 'email'}
           activeOpacity={0.85}
         >
@@ -336,31 +418,50 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
               <ActivityIndicator color="#F5ECD7" />
             ) : (
               <Text style={styles.submitButtonText}>
-                {isSignUp ? 'Create Account →' : 'Sign In →'}
+                {screenMode === 'forgot'
+                  ? 'Send Reset Link'
+                  : screenMode === 'reset'
+                  ? 'Update Password'
+                  : isSignUp
+                  ? 'Create Account →'
+                  : 'Sign In →'}
               </Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* Toggle mode */}
-        <TouchableOpacity
-          onPress={() => {
-            setIsSignUp((v) => !v);
-            setPassword('');
-            setConfirmPassword('');
-          }}
-          style={styles.toggleRow}
-        >
-          <Text style={styles.toggleText}>
-            {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
-            <Text style={styles.toggleLink}>
-              {isSignUp ? 'Sign In' : 'Sign Up'}
+        {/* Footer toggles */}
+        {screenMode === 'email' && (
+          <TouchableOpacity
+            onPress={() => {
+              setIsSignUp((v) => !v);
+              setPassword('');
+              setConfirmPassword('');
+            }}
+            style={styles.toggleRow}
+          >
+            <Text style={styles.toggleText}>
+              {isSignUp ? 'Already have an account? ' : "Don't have an account? "}
+              <Text style={styles.toggleLink}>
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </Text>
             </Text>
-          </Text>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+
+        {(screenMode === 'forgot' || screenMode === 'reset') && (
+          <TouchableOpacity
+            onPress={() => setScreenMode('email')}
+            style={styles.toggleRow}
+          >
+            <Text style={styles.toggleText}>
+              Back to <Text style={styles.toggleLink}>Login</Text>
+            </Text>
+          </TouchableOpacity>
+        )}
 
         {/* Other providers link */}
-        {!initialMode && (
+        {!initialMode && screenMode === 'email' && (
           <TouchableOpacity
             onPress={() => setScreenMode('main')}
             style={styles.otherProvidersRow}
@@ -575,4 +676,10 @@ const styles = StyleSheet.create({
 
   otherProvidersRow: { alignItems: 'center', marginTop: 2 },
   otherProvidersText: { fontSize: 13, color: '#B5947A', textDecorationLine: 'underline' },
+
+  forgotMainRow: { alignItems: 'center', marginTop: 12 },
+  forgotMainText: { fontSize: 14, color: '#8C6246', fontWeight: '500', textDecorationLine: 'underline' },
+
+  forgotEmailRow: { alignSelf: 'flex-end', marginTop: -8, marginBottom: 8 },
+  forgotEmailText: { fontSize: 13, color: '#C9705A', fontWeight: '600' },
 });

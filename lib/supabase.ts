@@ -1,5 +1,6 @@
 import 'react-native-url-polyfill/auto';
 import * as SecureStore from 'expo-secure-store';
+import * as Linking from 'expo-linking';
 import { Platform } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 
@@ -35,8 +36,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     storage: ExpoSecureStoreAdapter,
     autoRefreshToken: true,
     persistSession: true,
-    // On web, Supabase reads the #access_token hash from the OAuth redirect URL.
-    // On native, URL handling is done differently (deep links), so keep false.
-    detectSessionInUrl: Platform.OS === 'web',
+    detectSessionInUrl: true, // Let Supabase handle the URL (essential for OAuth/Recovery)
+    flowType: 'pkce', // Recommended for better security in modern apps
   },
 });

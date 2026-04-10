@@ -29,6 +29,96 @@ export const BOND_META: Record<BondType, { emoji: string; label: string; color: 
   other:      { emoji: '✨', label: 'Other',       color: '#B5947A' },
 };
 
+export type ChatThemeOption = 'classic' | 'midnight' | 'cherry' | 'forest' | 'ocean';
+
+export interface ThemeConfig {
+  id: ChatThemeOption;
+  name: string;
+  bgColors: [string, string, string]; // Top to Bottom LinearGradient
+  textColor: string;
+  myBubbleColor: string;
+  themBubbleColor: string;
+  myBubbleText: string;
+  themBubbleText: string;
+  borderColor: string;
+  inputBgColor: string;
+  inputTextColor: string;
+  headerBgColor: string;
+}
+
+export const CHAT_THEMES: Record<ChatThemeOption, ThemeConfig> = {
+  classic: {
+    id: 'classic',
+    name: 'Classic Creme',
+    bgColors: ['#FDFAF4', '#F5ECD7', '#EDD9B8'],
+    textColor: '#3D2B1F',
+    myBubbleColor: '#C9705A',
+    themBubbleColor: '#FDFAF4',
+    myBubbleText: '#FDFAF4',
+    themBubbleText: '#3D2B1F',
+    borderColor: '#D9BC8A',
+    inputBgColor: '#F5ECD7',
+    inputTextColor: '#3D2B1F',
+    headerBgColor: '#FDFAF4',
+  },
+  midnight: {
+    id: 'midnight',
+    name: 'Midnight',
+    bgColors: ['#121212', '#1A1A1A', '#0F0F0F'],
+    textColor: '#E0E0E0',
+    myBubbleColor: '#3A3A4A',
+    themBubbleColor: '#242424',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#E0E0E0',
+    borderColor: '#333333',
+    inputBgColor: '#1A1A1A',
+    inputTextColor: '#FFFFFF',
+    headerBgColor: '#181818',
+  },
+  cherry: {
+    id: 'cherry',
+    name: 'Cherry',
+    bgColors: ['#FFF0F5', '#FFE4E1', '#FFC0CB'],
+    textColor: '#4A1D2C',
+    myBubbleColor: '#E75480',
+    themBubbleColor: '#FFFFFF',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#4A1D2C',
+    borderColor: '#FFB6C1',
+    inputBgColor: '#FFF0F5',
+    inputTextColor: '#4A1D2C',
+    headerBgColor: '#FFF0F5',
+  },
+  forest: {
+    id: 'forest',
+    name: 'Forest',
+    bgColors: ['#E6F0E6', '#CDE0D1', '#A6C5AD'],
+    textColor: '#1B3D2B',
+    myBubbleColor: '#3D6B50',
+    themBubbleColor: '#F3F8F4',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#1B3D2B',
+    borderColor: '#A6C5AD',
+    inputBgColor: '#E6F0E6',
+    inputTextColor: '#1B3D2B',
+    headerBgColor: '#E6F0E6',
+  },
+  ocean: {
+    id: 'ocean',
+    name: 'Ocean',
+    bgColors: ['#F0F8FF', '#E1F0F5', '#B0E0E6'],
+    textColor: '#1A3C56',
+    myBubbleColor: '#4A90E2',
+    themBubbleColor: '#FFFFFF',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#1A3C56',
+    borderColor: '#B0DFE5',
+    inputBgColor: '#F0F8FF',
+    inputTextColor: '#1A3C56',
+    headerBgColor: '#FFFFFF',
+  }
+};
+
 export interface Bond {
   id: string;
   user_a: string;
@@ -37,6 +127,7 @@ export interface Bond {
   bond_type: BondType;
   status: 'pending' | 'active' | 'dissolved';
   created_at: string;
+  theme?: ChatThemeOption | string;
 }
 
 export interface Profile {

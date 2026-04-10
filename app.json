@@ -3,6 +3,7 @@
     "name": "TAKAM",
     "slug": "takam",
     "version": "1.0.0",
+    "scheme": "takam",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
