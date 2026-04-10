@@ -738,4 +738,9 @@ const styles = StyleSheet.create({
   milestoneIconBox: { width: 80, height: 80, backgroundColor: '#EDD9B8', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 12, transform: [{ rotate: '3deg' }] },
   milestoneTitle: { fontSize: 18, fontWeight: '800', color: '#3D2B1F', marginBottom: 4 },
   milestoneDesc: { fontSize: 13, color: '#8C6246', textAlign: 'center', opacity: 0.8 },
+
+  // Interactive UI Styles
+  bubbleReplyInner: { backgroundColor: 'rgba(255,255,255,0.25)', padding: 12, borderRadius: 16, marginBottom: 8 },
+  bubbleReplyName: { fontSize: 11, fontWeight: '800', color: '#FDFAF4', marginBottom: 2 },
+  bubbleReplyText: { fontSize: 13, color: '#FDFAF4', opacity: 0.9 },
 });
