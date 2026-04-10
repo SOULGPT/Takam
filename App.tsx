@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View, StyleSheet, AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { supabase } from './lib/supabase';
+import * as Linking from 'expo-linking';
 import { useStore, Bond, Profile } from './store/useStore';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
@@ -183,6 +184,17 @@ function AppCore() {
       setLoading(false);
     });
 
+    const handleUrl = (url: string) => {
+      const { queryParams } = Linking.parse(url);
+      if (queryParams?.access_token) {
+        // Supabase catch-all for deep links with tokens
+      }
+    };
+
+    const linkSub = Linking.addEventListener('url', (event) => {
+      handleUrl(event.url);
+    });
+
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session: Session | null) => {
@@ -195,7 +207,10 @@ function AppCore() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      linkSub.remove();
+      subscription.unsubscribe();
+    };
   }, []);
 
   // ── Loading spinner ───────────────────────────────────────────────────────

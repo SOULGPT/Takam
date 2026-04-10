@@ -11,9 +11,10 @@ import {
   ActivityIndicator,
   Animated,
   Modal,
-  Alert,
   Dimensions,
+  ImageBackground,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { Swipeable } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -60,6 +61,7 @@ export default function ChatScreen() {
     if (!activeBondId || !session?.user || !activeBond) return;
     
     updateBond({ ...activeBond, theme: newTheme }); 
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await supabase.from('bonds').update({ theme: newTheme }).eq('id', activeBondId);
     
     const sysMsg: Message = {
@@ -91,6 +93,7 @@ export default function ChatScreen() {
     
     setContextPos({ x, y: clampedY });
     setContextMenuMsg(msg);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.parallel([
       Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
       Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true })
@@ -308,7 +311,10 @@ export default function ChatScreen() {
       <Swipeable
         renderRightActions={isMe ? renderRightSwipe : undefined}
         renderLeftActions={!isMe ? renderRightSwipe : undefined}
-        onSwipeableOpen={() => setReplyTarget(item)}
+        onSwipeableOpen={() => {
+          setReplyTarget(item);
+          Haptics.selectionAsync();
+        }}
       >
         <View style={[styles.bubbleWrap, isMe ? styles.bubbleMeWrap : styles.bubbleThemWrap]}>
           {!isMe && (
@@ -346,6 +352,13 @@ export default function ChatScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
+      
+      <ImageBackground 
+        source={require('../assets/chat-bg-pattern.png')} 
+        style={StyleSheet.absoluteFill}
+        imageStyle={{ opacity: 0.04, tintColor: th.textColor }}
+        resizeMode="repeat"
+      />
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16, backgroundColor: th.headerBgColor, borderBottomColor: th.borderColor }]}>
