@@ -31,6 +31,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { startRecording as walkieStartRecording, stopRecording as walkieStopRecording } from '../lib/walkieTalkie';
+import chatPattern from '../assets/chat-bg-pattern.png';
 
 type Message = {
   id: string;
@@ -616,7 +617,7 @@ export default function ChatScreen() {
         <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
         
         <ImageBackground 
-          source={require('../assets/chat-bg-pattern.png')} 
+          source={chatPattern} 
           style={StyleSheet.absoluteFill}
           imageStyle={{ opacity: 0.04, tintColor: th.textColor }}
           resizeMode="repeat"

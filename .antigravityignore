@@ -1,0 +1,15 @@
+# Ignore binary assets from text scanning
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.webp
+**/*.mp3
+**/*.m4a
+**/*.wav
+**/*.ico
+
+# Ignore build artifacts
+dist/
+.expo/
+node_modules/
