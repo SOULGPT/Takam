@@ -53,7 +53,7 @@ const VIBES = [
 
 export default function HomeScreen() {
   const nav = useNavigation<any>();
-  const { profile, bonds, bondMembers, activeBondId, setActiveBondId } = useStore();
+  const { profile, bonds, bondMembers, activeBondId, setActiveBondId, unreadCounts } = useStore();
   const [sending, setSending] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
   const [isWalkieActive, setIsWalkieActive] = useState(false);
@@ -86,22 +86,6 @@ export default function HomeScreen() {
     };
     fetchUnreadMsgs();
 
-    // Fetch unread vibes
-    const fetchUnreadVibes = async () => {
-      const { data } = await supabase
-        .from('vibes')
-        .select('*')
-        .eq('bond_id', activeBondId)
-        .is('read_at', null)
-        .neq('sender_id', profile.id)
-        .order('sent_at', { ascending: true });
-        
-      if (data && data.length > 0) {
-        setVibeQueue(data);
-      }
-    };
-    fetchUnreadVibes();
-
     const channel = supabase.channel(`home_unread:${activeBondId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `bond_id=eq.${activeBondId}` }, (payload: any) => {
         const msg = payload.new as any;
@@ -127,24 +111,31 @@ export default function HomeScreen() {
       // Play sound mapping based on vibe_type
       playSound(nextVibe.vibe_type as any);
       
-      // Fade & pop in
-      Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
-        Animated.spring(overlayScale, { toValue: 1, friction: 6, tension: 50, useNativeDriver: Platform.OS !== 'web' }),
+      // Fade & pop in, then pulse
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(overlayOpacity, { toValue: 1, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.spring(overlayScale, { toValue: 1, friction: 5, tension: 60, useNativeDriver: Platform.OS !== 'web' }),
+        ]),
+        Animated.timing(overlayScale, { toValue: 1.15, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(overlayScale, { toValue: 1.0, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(overlayScale, { toValue: 1.1, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.timing(overlayScale, { toValue: 1.0, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
 
       // Mark read in DB
       supabase.from('vibes').update({ read_at: new Date().toISOString() }).eq('id', nextVibe.id).then();
       
-      // Fade out after 2.5s
+      // Fade out after 3.5s
       setTimeout(() => {
         Animated.parallel([
-          Animated.timing(overlayOpacity, { toValue: 0, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
-          Animated.timing(overlayScale, { toValue: 0.8, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(overlayOpacity, { toValue: 0, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(overlayScale, { toValue: 1.5, duration: 500, useNativeDriver: Platform.OS !== 'web' }),
         ]).start(() => {
           setPlayingVibe(null);
+          overlayScale.setValue(0.5); // Reset properly
         });
-      }, 2500);
+      }, 3500);
     }
   }, [vibeQueue, playingVibe]);
 
@@ -283,12 +274,22 @@ export default function HomeScreen() {
                   onPress={() => setActiveBondId(b.id)}
                   activeOpacity={0.8}
                 >
-                  <BlobAvatar 
-                    initials={initials(pName)} 
-                    color={BOND_META[b.bond_type]?.color || '#B5947A'}
-                    isActive={isActive}
-                    size={isActive ? 90 : 75}
-                  />
+                  <View>
+                    <BlobAvatar 
+                      avatarKey={bPartner?.avatar_url || undefined}
+                      initials={initials(pName)} 
+                      color={BOND_META[b.bond_type]?.color || '#B5947A'}
+                      isActive={isActive}
+                      size={isActive ? 90 : 75}
+                    />
+                    {unreadCounts[b.id] > 0 && (
+                      <View style={[styles.unreadBadge, isActive && { top: 0, right: 0 }]}>
+                        <Text style={styles.unreadBadgeText}>
+                          {unreadCounts[b.id] > 99 ? '99+' : unreadCounts[b.id]}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={[styles.bondMemberName, isActive && { color: '#C9705A', fontWeight: '800' }]}>{pName}</Text>
                   <Text style={styles.bondMemberRole}>{BOND_META[b.bond_type]?.label}</Text>
                 </TouchableOpacity>
@@ -346,9 +347,9 @@ export default function HomeScreen() {
       >
         <Text style={styles.chatIcon}>💬</Text>
         <Text style={styles.chatBtnText}>Open Chat</Text>
-        {unreadCount > 0 && (
-          <View style={styles.unreadBadge}>
-            <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+        {activeBond && unreadCounts[activeBond.id] > 0 && (
+          <View style={styles.chatUnreadBadge}>
+            <Text style={styles.chatUnreadBadgeText}>{unreadCounts[activeBond.id]}</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -454,6 +455,27 @@ const styles = StyleSheet.create({
   bondMember: { alignItems: 'center', width: 100 },
   bondMemberName: { fontSize: 13, fontWeight: '700', color: '#3D2B1F', marginTop: 8 },
   bondMemberRole: { fontSize: 9, fontWeight: '800', color: '#8C6246', textTransform: 'uppercase', opacity: 0.6 },
+  unreadBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#DB4B4B',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+    borderWidth: 2,
+    borderColor: '#FDFAF4',
+    zIndex: 10,
+  },
+  unreadBadgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
 
   // Main Content
   mainContent: { flex: 1, paddingHorizontal: 24, marginTop: 24, paddingBottom: 40 },
@@ -484,9 +506,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 9999,
   },
-  overlayEmoji: { fontSize: 96, marginBottom: 16 },
-  overlayTitle: { fontSize: 32, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.5, textAlign: 'center' },
-  overlaySub: { fontSize: 16, color: '#FDFAF4', opacity: 0.8, marginTop: 8 },
+  overlayEmoji: { fontSize: 120, marginBottom: 20, textShadowColor: 'rgba(0,0,0,0.2)', textShadowOffset: { width: 0, height: 10 }, textShadowRadius: 20 },
+  overlayTitle: { fontSize: 34, fontWeight: '900', color: '#FDFAF4', letterSpacing: 0.5, textAlign: 'center' },
+  overlaySub: { fontSize: 18, color: '#FDFAF4', opacity: 0.9, marginTop: 8, fontWeight: '600' },
 
   // ── Chat Button ──
   chatButton: {
@@ -510,7 +532,7 @@ const styles = StyleSheet.create({
   },
   chatIcon: { fontSize: 18, marginRight: 8 },
   chatBtnText: { fontSize: 16, fontWeight: '800', color: '#3D2B1F' },
-  unreadBadge: {
+  chatUnreadBadge: {
     marginLeft: 8,
     backgroundColor: '#C9705A',
     borderRadius: 10,
@@ -520,7 +542,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 6,
   },
-  unreadBadgeText: { fontSize: 11, fontWeight: '800', color: '#FDFAF4' },
+  chatUnreadBadgeText: { fontSize: 11, fontWeight: '800', color: '#FDFAF4' },
 
   // ── Feedback Badge ──
   sentBadge: {

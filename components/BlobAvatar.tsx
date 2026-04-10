@@ -1,43 +1,55 @@
 import React from 'react';
 import { View, Image, StyleSheet, Text } from 'react-native';
+import { AVATARS } from '../utils/avatars';
 
 interface BlobAvatarProps {
-  uri?: string;
+  avatarKey?: string;
   size?: number;
   initials?: string;
   color?: string;
   isActive?: boolean;
 }
 
-export default function BlobAvatar({ uri, size = 80, initials, color = '#EDD9B8', isActive }: BlobAvatarProps) {
-  const borderRadiusBase = size / 2;
-  
-  // Approximating the organic blob shape with asymmetric radii
+export default function BlobAvatar({ avatarKey, size = 80, initials, color = '#EDD9B8', isActive }: BlobAvatarProps) {
+  // Organic blob shape with asymmetric radii for the ring / fallback
   const blobStyle = {
-    width: size,
-    height: size,
-    borderTopLeftRadius: size * 0.38,
-    borderTopRightRadius: size * 0.62,
-    borderBottomRightRadius: size * 0.63,
-    borderBottomLeftRadius: size * 0.37,
-    backgroundColor: color,
-    overflow: 'hidden' as const,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
+    position: 'absolute' as const,
+    width: size + 8,
+    height: size + 8,
+    borderTopLeftRadius: (size + 8) * 0.38,
+    borderTopRightRadius: (size + 8) * 0.62,
+    borderBottomRightRadius: (size + 8) * 0.63,
+    borderBottomLeftRadius: (size + 8) * 0.37,
+    borderWidth: 2,
+    borderColor: '#C9705A',
   };
+
+  const hasImage = avatarKey && AVATARS[avatarKey];
 
   return (
     <View style={[styles.container, { width: size + 8, height: size + 8 }]}>
-      <View style={[blobStyle, isActive && styles.activeRing]}>
-        {uri ? (
-          <Image source={{ uri }} style={styles.image} />
+      {isActive && <View style={blobStyle} />}
+      
+      <View style={[
+        { width: size, height: size, alignItems: 'center', justifyContent: 'center', backgroundColor: color, overflow: 'hidden' },
+        hasImage || isActive 
+          ? { borderRadius: size / 2 } // Perfect circle if it's an image or active ring surrounds it
+          : {  // Flat blob if not active and no image
+              borderTopLeftRadius: size * 0.38,
+              borderTopRightRadius: size * 0.62,
+              borderBottomRightRadius: size * 0.63,
+              borderBottomLeftRadius: size * 0.37,
+            }
+      ]}>
+        {hasImage ? (
+          <Image source={AVATARS[avatarKey]} style={styles.image} />
         ) : (
           <Text style={[styles.initials, { fontSize: size * 0.35 }]}>{initials}</Text>
         )}
       </View>
+      
       {isActive && (
         <View style={styles.activityIndicator}>
-           {/* Visual for graphic_eq / pulse would go here */}
            <View style={styles.miniPulse} />
         </View>
       )}

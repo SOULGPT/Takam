@@ -129,7 +129,21 @@ function AppCore() {
             .map((b) => fetchMember(b, session.user.id)),
         );
 
-        // 4. Default active bond → first active one
+        // 4. Fetch initial Unread Counts
+        try {
+          const { data: unreadData } = await supabase.rpc('get_unread_counts');
+          if (unreadData) {
+            const countsMap: Record<string, number> = {};
+            unreadData.forEach((row: any) => {
+              countsMap[row.bond_id] = Number(row.unread_count || 0);
+            });
+            useStore.getState().setUnreadCounts(countsMap);
+          }
+        } catch (e) {
+          console.warn('Failed to fetch unread counts', e);
+        }
+
+        // 5. Default active bond → first active one
         const firstActive = allBonds.find((b) => b.status === 'active');
         if (firstActive) setActiveBondId(firstActive.id);
       } catch (_) {}
@@ -178,6 +192,39 @@ function AppCore() {
       channels.forEach((ch) => supabase.removeChannel(ch));
     };
   }, [bonds.map((b) => b.id).join(','), session?.user?.id]);
+
+  // ── Global Real-time Watcher for Unread Counts ───────────────────────────
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const globalChannel = supabase
+      .channel('global_unread_watcher')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          if (payload.new.sender_id !== session.user.id) {
+            // Only increment if we are not currently actively looking at THIS bond's ChatScreen
+            // (We'll assume strict clearing happens in ChatScreen onFocus)
+            useStore.getState().incrementUnread(payload.new.bond_id, 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'vibes' },
+        (payload) => {
+          if (payload.new.sender_id !== session.user.id) {
+            useStore.getState().incrementUnread(payload.new.bond_id, 1);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(globalChannel);
+    };
+  }, [session?.user?.id]);
 
   // ── Auth bootstrap + listener ─────────────────────────────────────────────
   useEffect(() => {

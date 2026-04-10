@@ -11,9 +11,7 @@ ALTER TABLE messages ADD COLUMN IF NOT EXISTS media_type TEXT DEFAULT 'text'; --
 
 -- 3. Create Storage Bucket for chat-media (Must be done in Supabase UI or via SQL)
 -- This SQL attempts to create the bucket and set up policies.
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('chat-media', 'chat-media', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('chat-media', 'chat-media', true) ON CONFLICT (id) DO NOTHING;
 
 -- Policies for chat-media
 -- Allow all authenticated users to upload

@@ -7,9 +7,7 @@
 ALTER TABLE messages ALTER COLUMN content DROP NOT NULL;
 
 -- 2. Create 'walkie-bursts' storage bucket
-INSERT INTO storage.buckets (id, name, public) 
-VALUES ('walkie-bursts', 'walkie-bursts', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public) VALUES ('walkie-bursts', 'walkie-bursts', true) ON CONFLICT (id) DO NOTHING;
 
 -- 3. Storage Policies for walkie-bursts
 -- Allow authenticated users to upload their bursts
@@ -37,9 +35,7 @@ END $$;
 -- 4. Ensure chat-media policies are robust
 DO $$
 BEGIN
-    INSERT INTO storage.buckets (id, name, public) 
-    VALUES ('chat-media', 'chat-media', true)
-    ON CONFLICT (id) DO NOTHING;
+    INSERT INTO storage.buckets (id, name, public) VALUES ('chat-media', 'chat-media', true) ON CONFLICT (id) DO NOTHING;
 EXCEPTION
     WHEN others THEN NULL;
 END $$;

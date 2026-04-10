@@ -5,32 +5,18 @@
 -- 1. Extend Profiles for Admin / CRM
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'user';
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS address TEXT;
-ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS phone TEXT; ALTER TABLE profiles ADD COLUMN IF NOT EXISTS address TEXT; ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_premium BOOLEAN DEFAULT false;
 
 -- Update the new_user trigger to save email into profiles for the CRM
-CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-SECURITY DEFINER SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_user() RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
-  INSERT INTO public.profiles (id, display_name, avatar_url, email)
-  VALUES (
-    NEW.id,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'),
-    NEW.raw_user_meta_data->>'avatar_url',
-    NEW.email
-  )
-  ON CONFLICT (id) DO NOTHING;
+  INSERT INTO public.profiles (id, display_name, avatar_url, email) VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name'), NEW.raw_user_meta_data->>'avatar_url', NEW.email) ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
 $$;
 
 -- 2. Prevent Infinite Recursion with an Admin Checker Function
-CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS BOOLEAN AS $$
+CREATE OR REPLACE FUNCTION public.is_admin() RETURNS BOOLEAN AS $$
   SELECT EXISTS(SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin');
 $$ LANGUAGE sql SECURITY DEFINER;
 

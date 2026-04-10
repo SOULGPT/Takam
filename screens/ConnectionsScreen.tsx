@@ -40,19 +40,25 @@ function BondCard({
   onSetActive,
   onRemove,
   isActive,
+  onAccept,
+  onReject,
 }: {
   bond: Bond;
   myId: string;
   onSetActive: () => void;
   onRemove: () => void;
   isActive: boolean;
+  onAccept?: () => void;
+  onReject?: () => void;
 }) {
   const { bondMembers } = useStore();
   const partner = bondMembers[bond.id];
   const meta = BOND_META[bond.bond_type] ?? BOND_META.other;
   const partnerName = partner?.display_name ?? partner?.username ?? '—';
   const isPending = bond.status === 'pending';
-  const isMine = bond.user_a === myId;
+  const isRequested = bond.status === 'requested';
+  const isCreator = bond.user_a === myId;
+  const isActionable = isRequested || isPending;
 
   const copyCode = () => {
     if (Platform.OS === 'web') {
@@ -64,35 +70,40 @@ function BondCard({
     }
   };
 
+  let titleText = partnerName;
+  if (isPending) {
+    titleText = isCreator ? 'Waiting for someone to join…' : 'Connecting…';
+  } else if (isRequested) {
+    titleText = isCreator ? `${partnerName} wants to connect!` : 'Waiting for their approval…';
+  }
+
   return (
     <TouchableOpacity
       style={[styles.bondCard, isActive && styles.bondCardActive]}
-      onPress={isPending ? undefined : onSetActive}
-      activeOpacity={isPending ? 1 : 0.85}
+      onPress={isActionable ? undefined : onSetActive}
+      activeOpacity={isActionable ? 1 : 0.85}
     >
-      {/* Active indicator stripe */}
       {isActive && <View style={[styles.activeStripe, { backgroundColor: meta.color }]} />}
 
       <View style={styles.cardRow}>
-        {/* Avatar */}
         <View style={[styles.avatar, { backgroundColor: meta.color }]}>
           <Text style={styles.avatarText}>
             {isPending ? '?' : initials(partnerName || '?')}
           </Text>
         </View>
 
-        {/* Info */}
         <View style={styles.cardInfo}>
           <View style={styles.cardNameRow}>
             <Text style={styles.cardName} numberOfLines={1}>
-              {isPending ? (isMine ? 'Waiting for reply…' : 'Being connected…') : partnerName}
+              {titleText}
             </Text>
-            {isActive && !isPending && (
+            {isActive && !isActionable && (
               <View style={[styles.activeBadge, { backgroundColor: meta.color + '22', borderColor: meta.color }]}>
                 <Text style={[styles.activeBadgeText, { color: meta.color }]}>Active</Text>
               </View>
             )}
           </View>
+
           <View style={styles.typeBadgeRow}>
             <Text style={styles.typeEmoji}>{meta.emoji}</Text>
             <Text style={styles.typeLabel}>{meta.label}</Text>
@@ -101,34 +112,48 @@ function BondCard({
                 <Text style={styles.pendingPillText}>Pending</Text>
               </View>
             )}
+            {isRequested && (
+              <View style={[styles.pendingPill, { backgroundColor: '#F0DC8A' }]}>
+                <Text style={[styles.pendingPillText, { color: '#6B5800' }]}>Requested</Text>
+              </View>
+            )}
           </View>
 
-          {/* Pending: show code + copy */}
-          {isPending && isMine && (
+          {isPending && isCreator && (
             <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.75}>
               <Text style={styles.codeText}>{bond.bond_code}</Text>
               <Text style={styles.copyLabel}>📋 Copy</Text>
             </TouchableOpacity>
           )}
+
+          {isRequested && isCreator && onAccept && onReject && (
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity style={styles.btnAccept} onPress={onAccept}>
+                <Text style={styles.btnAcceptText}>Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.btnReject} onPress={onReject}>
+                <Text style={styles.btnRejectText}>Reject</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
-        {/* Actions menu */}
         <TouchableOpacity
           style={styles.menuBtn}
           onPress={() => {
             const options: any[] = [];
-            if (!isPending) {
+            if (!isActionable) {
               options.push({ text: '✦ Set as Active', onPress: onSetActive });
             }
             options.push({
-              text: isPending ? 'Cancel & Delete' : 'Remove Connection',
+              text: isActionable ? 'Cancel & Delete' : 'Remove Connection',
               style: 'destructive',
               onPress: onRemove,
             });
             options.push({ text: 'Cancel', style: 'cancel' });
             Alert.alert(
-              isPending ? 'Pending Bond' : partnerName,
-              isPending ? 'What would you like to do?' : `Manage your ${meta.label} bond`,
+              isActionable ? 'Pending Bond' : partnerName,
+              isActionable ? 'What would you like to do?' : `Manage your ${meta.label} bond`,
               options,
             );
           }}
@@ -272,13 +297,13 @@ export default function ConnectionsScreen() {
 
       const { data: updated, error: joinErr } = await supabase
         .from('bonds')
-        .update({ user_b: session.user.id, status: 'active' })
+        .update({ user_b: session.user.id, status: 'requested' })
         .eq('id', found.id)
         .select()
         .maybeSingle();
 
       if (joinErr) throw new Error(joinErr.message);
-      if (!updated) throw new Error('Could not activate bond. Please try again.');
+      if (!updated) throw new Error('Could not join bond. Please try again.');
 
       addBond(updated as Bond);
       // Fetch partner profile
@@ -290,15 +315,46 @@ export default function ConnectionsScreen() {
       if (partnerProfile) {
         useStore.getState().setBondMember(updated.id, partnerProfile);
       }
-      if (!activeBondId) setActiveBondId(updated.id);
 
       setJoinCode('');
       setMode('list');
-      Alert.alert('Connected! 💞', `You are now bonded as ${BOND_META[updated.bond_type as BondType]?.label}.`);
+      Alert.alert('Request Sent! ⏳', `We notified them to approve your ${BOND_META[updated.bond_type as BondType]?.label} bond request.`);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Accept bond ───────────────────────────────────────────────────────────
+  const handleAccept = async (bond: Bond) => {
+    try {
+      const { data, error } = await supabase
+        .from('bonds')
+        .update({ status: 'active' })
+        .eq('id', bond.id)
+        .select()
+        .maybeSingle();
+      if (error) throw error;
+      if (data) {
+        updateBond(data as Bond);
+        if (!activeBondId) setActiveBondId(data.id);
+        Alert.alert('Accepted! 💞', 'The bond is now active.');
+      }
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
+  // ── Reject bond ───────────────────────────────────────────────────────────
+  const handleReject = async (bond: Bond) => {
+    try {
+      // Deleting the bond entirely if rejected
+      const { error } = await supabase.from('bonds').delete().eq('id', bond.id);
+      if (error) throw error;
+      removeBond(bond.id);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
     }
   };
 
@@ -390,6 +446,8 @@ export default function ConnectionsScreen() {
                 isActive={item.id === activeBondId}
                 onSetActive={() => handleSetActive(item.id)}
                 onRemove={() => handleRemove(item)}
+                onAccept={() => handleAccept(item)}
+                onReject={() => handleReject(item)}
               />
             )}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
@@ -691,6 +749,13 @@ const styles = StyleSheet.create({
   copyLabel: { fontSize: 12, color: '#8C6246', fontWeight: '600' },
   menuBtn: { paddingLeft: 6 },
   menuDots: { fontSize: 16, color: '#B5947A', fontWeight: '700', letterSpacing: -1 },
+
+  // Action Buttons
+  actionButtonsRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  btnAccept: { backgroundColor: '#C9705A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  btnAcceptText: { color: '#FDFAF4', fontSize: 13, fontWeight: '700' },
+  btnReject: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#D9BC8A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  btnRejectText: { color: '#8C6246', fontSize: 13, fontWeight: '700' },
 
   // ── Empty state ──
   emptyWrap: {

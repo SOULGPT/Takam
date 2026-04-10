@@ -8,11 +8,16 @@ import {
   Alert,
   ActivityIndicator,
   StatusBar,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { useNavigation } from '@react-navigation/native';
+import { AVATARS, MALE_AVATAR_KEYS, FEMALE_AVATAR_KEYS } from '../utils/avatars';
 
 export default function ProfileScreen() {
   const { profile, bonds, bondMembers, activeBondId, setProfile, reset } = useStore();
@@ -21,6 +26,50 @@ export default function ProfileScreen() {
   const nav = useNavigation<any>();
   
   const [loading, setLoading] = useState(false);
+  
+  // Edit State
+  const [isEditing, setIsEditing] = useState(false);
+  const [form, setForm] = useState({
+    username: profile?.username || '',
+    bio: profile?.bio || '',
+    sex: profile?.sex || '',
+    avatar_url: profile?.avatar_url || '',
+    country: profile?.country || '',
+  });
+
+  const handleSaveProfile = async () => {
+    if (!profile) return;
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          username: form.username.trim() || null,
+          bio: form.bio.trim() || null,
+          sex: form.sex || null,
+          avatar_url: form.avatar_url || null,
+          country: form.country.trim() || null,
+        })
+        .eq('id', profile.id)
+        .select()
+        .single();
+        
+      if (error) throw error;
+      if (data) {
+        setProfile(data as any);
+        setIsEditing(false);
+        Alert.alert('Saved ✦', 'Your profile has been updated.');
+      }
+    } catch (e: any) {
+      if (e.message.includes('unique')) {
+        Alert.alert('Error', 'Username is already taken.');
+      } else {
+        Alert.alert('Error', e.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSignOut = async () => {
     setLoading(true);
@@ -45,10 +94,14 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarInitial}>
-              {profile?.display_name?.[0]?.toUpperCase() ?? 'U'}
-            </Text>
+          <View style={[styles.avatar, profile?.avatar_url && { backgroundColor: 'transparent' }]}>
+            {profile?.avatar_url && AVATARS[profile.avatar_url] ? (
+              <Image source={AVATARS[profile.avatar_url]} style={{ width: '100%', height: '100%', borderRadius: 999 }} />
+            ) : (
+              <Text style={styles.avatarInitial}>
+                {profile?.display_name?.[0]?.toUpperCase() ?? 'U'}
+              </Text>
+            )}
           </View>
           <Text style={styles.displayName}>{profile?.display_name ?? 'You'}</Text>
           <View style={[styles.tierBadge, { borderColor: tierColor }]}>
@@ -73,6 +126,116 @@ export default function ProfileScreen() {
                 : '—'
             }
           />
+        </View>
+
+        {/* Profile Info & Editing */}
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <Text style={styles.cardTitle}>Your Details</Text>
+            {isEditing ? (
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity onPress={() => setIsEditing(false)}>
+                  <Text style={{ color: '#8C6246', fontWeight: '600' }}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleSaveProfile} disabled={loading}>
+                  {loading ? <ActivityIndicator size="small" color="#C9705A"/> : <Text style={{ color: '#C9705A', fontWeight: '700' }}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={() => {
+                setForm({
+                  username: profile?.username || '',
+                  bio: profile?.bio || '',
+                  sex: profile?.sex || '',
+                  avatar_url: profile?.avatar_url || '',
+                  country: profile?.country || '',
+                });
+                setIsEditing(true);
+              }}>
+                <Text style={{ color: '#C9705A', fontWeight: '600' }}>Edit</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {isEditing ? (
+            <View style={{ gap: 12, marginTop: 8 }}>
+              <View>
+                <Text style={styles.inputLabel}>Username</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.username}
+                  onChangeText={(t) => setForm({ ...form, username: t })}
+                  placeholder="Username"
+                  autoCapitalize="none"
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Bio</Text>
+                <TextInput
+                  style={[styles.input, { height: 60, textAlignVertical: 'top' }]}
+                  value={form.bio}
+                  onChangeText={(t) => setForm({ ...form, bio: t })}
+                  placeholder="Short bio..."
+                  multiline
+                />
+              </View>
+              <View>
+                <Text style={styles.inputLabel}>Sex</Text>
+                <View style={styles.segmentsRow}>
+                  {['male', 'female', 'prefer_not_to_say'].map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      style={[styles.segmentBtn, form.sex === opt && styles.segmentBtnActive]}
+                      onPress={() => setForm({ ...form, sex: opt })}
+                    >
+                      <Text style={[styles.segmentTxt, form.sex === opt && styles.segmentTxtActive]}>
+                        {opt === 'prefer_not_to_say' ? 'Other' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+              
+              {/* Avatar Picker */}
+              {form.sex !== '' && (
+                <View>
+                  <Text style={styles.inputLabel}>Choose Avatar</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 4 }}>
+                    {(form.sex === 'male' ? MALE_AVATAR_KEYS : form.sex === 'female' ? FEMALE_AVATAR_KEYS : [...FEMALE_AVATAR_KEYS, ...MALE_AVATAR_KEYS]).map((key) => (
+                      <TouchableOpacity 
+                        key={key} 
+                        activeOpacity={0.8}
+                        onPress={() => setForm({ ...form, avatar_url: key })}
+                        style={[
+                          { padding: 4, borderRadius: 50 }, 
+                          form.avatar_url === key && { borderWidth: 2, borderColor: '#C9705A', backgroundColor: 'rgba(201, 112, 90, 0.1)' }
+                        ]}
+                      >
+                        <Image source={AVATARS[key]} style={{ width: 64, height: 64, borderRadius: 32 }} />
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              <View>
+                <Text style={styles.inputLabel}>Country</Text>
+                <TextInput
+                  style={styles.input}
+                  value={form.country}
+                  onChangeText={(t) => setForm({ ...form, country: t })}
+                  placeholder="Country"
+                />
+              </View>
+            </View>
+          ) : (
+            <>
+              <Row label="Username" value={profile?.username ? `@${profile.username}` : '—'} />
+              <Row label="Bio" value={profile?.bio || '—'} />
+              <Row label="Sex" value={profile?.sex ? (profile.sex === 'prefer_not_to_say' ? 'Other' : profile.sex.charAt(0).toUpperCase() + profile.sex.slice(1)) : '—'} />
+              <Row label="Country" value={profile?.country || '—'} />
+            </>
+          )}
         </View>
 
         {/* Upgrade card */}
@@ -201,4 +364,29 @@ const styles = StyleSheet.create({
     borderColor: '#C9705A40',
   },
   signOutText: { fontSize: 15, fontWeight: '700', color: '#9B3D2C' },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  inputLabel: { fontSize: 12, color: '#8C6246', fontWeight: '600', marginBottom: 4, marginLeft: 2 },
+  input: {
+    backgroundColor: '#FDFAF4',
+    borderWidth: 1,
+    borderColor: '#D9BC8A',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: '#3D2B1F',
+    fontSize: 14,
+  },
+  segmentsRow: { flexDirection: 'row', gap: 6 },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#D9BC8A',
+    alignItems: 'center',
+    backgroundColor: '#FDFAF4',
+  },
+  segmentBtnActive: { borderColor: '#C9705A', backgroundColor: '#C9705A' },
+  segmentTxt: { fontSize: 12, color: '#5C3D2E', fontWeight: '600' },
+  segmentTxtActive: { color: '#FFF' },
 });

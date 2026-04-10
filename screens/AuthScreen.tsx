@@ -17,6 +17,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
 import { signInWithGoogle } from '../lib/auth/google';
 import { signInWithApple, isAppleSignInAvailable } from '../lib/auth/apple';
+import { AVATARS, MALE_AVATAR_KEYS, FEMALE_AVATAR_KEYS } from '../utils/avatars';
+import { Image } from 'react-native';
 
 const { height } = Dimensions.get('window');
 
@@ -42,6 +44,19 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [username, setUsername] = useState('');
+  const [bio, setBio] = useState('');
+  const [sex, setSex] = useState<'male' | 'female' | 'prefer_not_to_say' | ''>('');
+  const [avatar, setAvatar] = useState<string>('');
+  const [country, setCountry] = useState('');
+
+  // Auto-select first avatar when sex changes
+  React.useEffect(() => {
+    if (sex === 'male') setAvatar(MALE_AVATAR_KEYS[0]);
+    else if (sex === 'female') setAvatar(FEMALE_AVATAR_KEYS[0]);
+    else if (sex === 'prefer_not_to_say') setAvatar(FEMALE_AVATAR_KEYS[0]); 
+  }, [sex]);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   // ── Google OAuth ──────────────────────────────────────────────────────────
   const handleGoogle = async () => {
@@ -75,14 +90,32 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
       Alert.alert('Invalid Input', 'Enter a valid email and a password (min 6 chars).');
       return;
     }
-    if (isSignUp && password !== confirmPassword) {
-      Alert.alert('Password Mismatch', 'Your passwords do not match.');
-      return;
+    if (isSignUp) {
+      if (password !== confirmPassword) {
+        Alert.alert('Password Mismatch', 'Your passwords do not match.');
+        return;
+      }
+      if (!username.trim() || !sex || !country.trim() || !acceptedTerms) {
+        Alert.alert('Incomplete', 'Please check that all fields are filled securely and accept the Terms & Conditions.');
+        return;
+      }
     }
     setLoading('email');
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email: email.trim(), password });
+        const { error } = await supabase.auth.signUp({ 
+          email: email.trim(), 
+          password,
+          options: {
+            data: {
+              username: username.trim(),
+              bio: bio.trim(),
+              sex,
+              avatar_url: avatar || null,
+              country: country.trim(),
+            }
+          }
+        });
         if (error) throw error;
         Alert.alert(
           'Check your email ✉️',
@@ -376,6 +409,95 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
               placeholderTextColor="#B5947A"
               secureTextEntry
             />
+          </View>
+        )}
+
+        {isSignUp && (
+          <View style={{ gap: 16 }}>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Username</Text>
+              <TextInput
+                style={styles.input}
+                value={username}
+                onChangeText={setUsername}
+                placeholder="e.g. takamlover99"
+                placeholderTextColor="#B5947A"
+                autoCapitalize="none"
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Bio (Optional)</Text>
+              <TextInput
+                style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="A short snippet about yourself..."
+                placeholderTextColor="#B5947A"
+                multiline
+              />
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Sex</Text>
+              <View style={styles.segmentsRow}>
+                {['male', 'female', 'prefer_not_to_say'].map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[styles.segmentBtn, sex === opt && styles.segmentBtnActive]}
+                    onPress={() => setSex(opt as any)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.segmentTxt, sex === opt && styles.segmentTxtActive]}>
+                      {opt === 'prefer_not_to_say' ? 'Other' : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            
+            {/* Avatar Picker */}
+            {sex !== '' && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Choose Avatar</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                  {(sex === 'male' ? MALE_AVATAR_KEYS : sex === 'female' ? FEMALE_AVATAR_KEYS : [...FEMALE_AVATAR_KEYS, ...MALE_AVATAR_KEYS]).map((key) => (
+                    <TouchableOpacity 
+                      key={key} 
+                      activeOpacity={0.8}
+                      onPress={() => setAvatar(key)}
+                      style={[
+                        { padding: 4, borderRadius: 50 }, 
+                        avatar === key && { borderWidth: 2, borderColor: '#C9705A', backgroundColor: 'rgba(201, 112, 90, 0.1)' }
+                      ]}
+                    >
+                      <Image source={AVATARS[key]} style={{ width: 64, height: 64, borderRadius: 32 }} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Country</Text>
+              <TextInput
+                style={styles.input}
+                value={country}
+                onChangeText={setCountry}
+                placeholder="e.g. United Kingdom"
+                placeholderTextColor="#B5947A"
+              />
+            </View>
+            <TouchableOpacity 
+              style={styles.checkboxRow} 
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+                {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
+              </View>
+              <Text style={styles.checkboxLabel}>
+                I accept the Terms & Conditions and acknowledge the Privacy Policy.
+              </Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -682,4 +804,44 @@ const styles = StyleSheet.create({
 
   forgotEmailRow: { alignSelf: 'flex-end', marginTop: -8, marginBottom: 8 },
   forgotEmailText: { fontSize: 13, color: '#C9705A', fontWeight: '600' },
+
+  checkboxRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 12 },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FDFAF4',
+  },
+  checkboxChecked: {
+    backgroundColor: '#C9705A',
+    borderColor: '#C9705A',
+  },
+  checkmark: { color: '#FFF', fontSize: 16, fontWeight: '900', marginTop: -2 },
+  checkboxLabel: { fontSize: 12, color: '#8C6246', flex: 1, lineHeight: 18 },
+  
+  segmentsRow: { flexDirection: 'row', gap: 8 },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#D9BC8A',
+    alignItems: 'center',
+    backgroundColor: '#FDFAF4',
+    shadowColor: '#3D2B1F',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  segmentBtnActive: {
+    borderColor: '#C9705A',
+    backgroundColor: '#C9705A',
+  },
+  segmentTxt: { fontSize: 14, color: '#5C3D2E', fontWeight: '600' },
+  segmentTxtActive: { color: '#FFF', fontWeight: '700' },
 });

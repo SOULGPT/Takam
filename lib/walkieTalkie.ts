@@ -66,17 +66,18 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
     // Slight delay to ensure filesystem is ready
     await new Promise(r => setTimeout(r, 100));
 
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: 'base64',
-    });
+    // Universal upload pattern: works on Web and Native
+    const response = await fetch(uri);
+    const blob = await response.blob();
 
-    const fileName = `burst_${bondId}_${Date.now()}.m4a`;
+    const actualExt = uri.split('.').pop() || 'm4a';
+    const fileName = `burst_${bondId}_${Date.now()}.${actualExt}`;
     const filePath = `${bondId}/${fileName}`;
 
     const { data, error } = await supabase.storage
       .from('walkie-bursts')
-      .upload(filePath, decode(base64), {
-        contentType: 'audio/m4a',
+      .upload(filePath, blob, {
+        contentType: actualExt === 'webm' ? 'audio/webm' : 'audio/m4a',
         upsert: true
       });
 

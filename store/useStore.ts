@@ -125,7 +125,7 @@ export interface Bond {
   user_b: string | null;
   bond_code: string;
   bond_type: BondType;
-  status: 'pending' | 'active' | 'dissolved';
+  status: 'pending' | 'requested' | 'active' | 'dissolved';
   created_at: string;
   theme?: ChatThemeOption | string;
 }
@@ -158,6 +158,9 @@ interface AppState {
   bondMembers: Record<string, Profile>; // partner Profile, keyed by bond_id
   activeBondId: string | null;          // which bond Home/Gift operates on
 
+  // ── Unread State ────────────────────────────────────────────────────────
+  unreadCounts: Record<string, number>; // bond_id -> unread_count
+
   // ── Actions ───────────────────────────────────────────────────────────────
   setSession: (session: Session | null) => void;
   setProfile: (profile: Profile | null) => void;
@@ -170,6 +173,10 @@ interface AppState {
   setBondMember: (bondId: string, profile: Profile) => void;
   setActiveBondId: (id: string | null) => void;
 
+  setUnreadCounts: (counts: Record<string, number>) => void;
+  incrementUnread: (bondId: string, amount?: number) => void;
+  clearUnread: (bondId: string) => void;
+
   reset: () => void;
 }
 
@@ -179,6 +186,7 @@ export const useStore = create<AppState>((set) => ({
   bonds: [],
   bondMembers: {},
   activeBondId: null,
+  unreadCounts: {},
 
   setSession: (session) => set({ session }),
   setProfile: (profile) => set({ profile }),
@@ -211,8 +219,25 @@ export const useStore = create<AppState>((set) => ({
       bondMembers: { ...state.bondMembers, [bondId]: profile },
     })),
 
-  setActiveBondId: (activeBondId) => set({ activeBondId }),
+  setActiveBondId: (id) => set({ activeBondId: id }),
 
-  reset: () =>
-    set({ session: null, profile: null, bonds: [], bondMembers: {}, activeBondId: null }),
+  setUnreadCounts: (counts) => set({ unreadCounts: counts }),
+
+  incrementUnread: (bondId, amount = 1) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [bondId]: (state.unreadCounts[bondId] || 0) + amount,
+      },
+    })),
+
+  clearUnread: (bondId) =>
+    set((state) => ({
+      unreadCounts: {
+        ...state.unreadCounts,
+        [bondId]: 0,
+      },
+    })),
+
+  reset: () => set({ session: null, profile: null, bonds: [], bondMembers: {}, activeBondId: null, unreadCounts: {} }),
 }));
