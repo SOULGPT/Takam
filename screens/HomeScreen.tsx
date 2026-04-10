@@ -10,6 +10,7 @@ import {
   Animated,
   Dimensions,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useStore, BOND_META } from '../store/useStore';
@@ -93,7 +94,7 @@ export default function HomeScreen() {
         .eq('bond_id', activeBondId)
         .is('read_at', null)
         .neq('sender_id', profile.id)
-        .order('created_at', { ascending: true });
+        .order('sent_at', { ascending: true });
         
       if (data && data.length > 0) {
         setVibeQueue(data);
@@ -128,8 +129,8 @@ export default function HomeScreen() {
       
       // Fade & pop in
       Animated.parallel([
-        Animated.timing(overlayOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.spring(overlayScale, { toValue: 1, friction: 6, tension: 50, useNativeDriver: true }),
+        Animated.timing(overlayOpacity, { toValue: 1, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+        Animated.spring(overlayScale, { toValue: 1, friction: 6, tension: 50, useNativeDriver: Platform.OS !== 'web' }),
       ]).start();
 
       // Mark read in DB
@@ -138,8 +139,8 @@ export default function HomeScreen() {
       // Fade out after 2.5s
       setTimeout(() => {
         Animated.parallel([
-          Animated.timing(overlayOpacity, { toValue: 0, duration: 400, useNativeDriver: true }),
-          Animated.timing(overlayScale, { toValue: 0.8, duration: 400, useNativeDriver: true }),
+          Animated.timing(overlayOpacity, { toValue: 0, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(overlayScale, { toValue: 0.8, duration: 400, useNativeDriver: Platform.OS !== 'web' }),
         ]).start(() => {
           setPlayingVibe(null);
         });

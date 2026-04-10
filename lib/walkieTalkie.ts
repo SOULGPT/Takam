@@ -1,8 +1,8 @@
 import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 import { supabase } from './supabase';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
-let recording: Audio.Recording | null = null;
+let recordingInstance: Audio.Recording | null = null;
 
 export const requestMicrophonePermission = async () => {
   const { status } = await Audio.requestPermissionsAsync();
@@ -11,6 +11,16 @@ export const requestMicrophonePermission = async () => {
 
 export const startRecording = async () => {
   try {
+    // 1. Safety Cleanup: Ensure any previous object is completely destroyed
+    if (recordingInstance) {
+      try {
+        await recordingInstance.stopAndUnloadAsync().catch(() => {});
+      } catch (e) {
+        // Already unloaded or other non-critical error
+      }
+      recordingInstance = null;
+    }
+
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
@@ -24,23 +34,35 @@ export const startRecording = async () => {
     const { recording: newRecording } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.LOW_QUALITY
     );
-    recording = newRecording;
+    recordingInstance = newRecording;
+    return true;
   } catch (err) {
     console.error('Failed to start recording', err);
+    recordingInstance = null;
+    throw err;
+  }
+};
+
+export const stopRecording = async () => {
+  if (!recordingInstance) return null;
+
+  try {
+    await recordingInstance.stopAndUnloadAsync();
+    const uri = recordingInstance.getURI();
+    recordingInstance = null;
+    return uri;
+  } catch (err) {
+    console.error('Failed to stop recording', err);
+    recordingInstance = null;
     throw err;
   }
 };
 
 export const stopRecordingAndUpload = async (bondId: string, userId: string) => {
-  if (!recording) return null;
+  const uri = await stopRecording();
+  if (!uri) return null;
 
   try {
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    recording = null;
-
-    if (!uri) throw new Error('No recording URI found');
-
     // Slight delay to ensure filesystem is ready
     await new Promise(r => setTimeout(r, 100));
 
@@ -66,15 +88,13 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
 
     return publicUrl;
   } catch (err) {
-    console.error('Failed to stop and upload recording', err);
+    console.error('Failed to upload recording', err);
     throw err;
   }
 };
 
 export const playBurst = async (url: string, onFinish?: () => void) => {
   try {
-    // We don't strictly NEED to disable allowsRecordingIOS here, 
-    // keeping it enabled prevents the entire audio engine from restarting
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
@@ -103,6 +123,9 @@ export const playBurst = async (url: string, onFinish?: () => void) => {
     throw err;
   }
 };
+
+// Helper: Check if hardware is busy
+export const isRecordingActive = () => !!recordingInstance;
 
 // Helper to decode base64 to ArrayBuffer for Supabase Storage
 export function decode(base64: string) {

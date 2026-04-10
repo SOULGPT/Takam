@@ -21,7 +21,7 @@ import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-nati
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
@@ -30,6 +30,7 @@ import { useStore, BOND_META, CHAT_THEMES, ChatThemeOption } from '../store/useS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
+import { startRecording as walkieStartRecording, stopRecording as walkieStopRecording } from '../lib/walkieTalkie';
 
 type Message = {
   id: string;
@@ -133,7 +134,6 @@ export default function ChatScreen() {
   
   // Media State
   const [isRecording, setIsRecording] = useState(false);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [recordDuration, setRecordDuration] = useState(0);
   const recordInterval = useRef<any>(null);
 
@@ -354,15 +354,14 @@ export default function ChatScreen() {
 
   const startRecording = async () => {
     try {
-      const { status } = await Audio.requestPermissionsAsync();
-      if (status !== 'granted') return;
+      const started = await walkieStartRecording();
+      if (!started) return;
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: newRecording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(newRecording);
       setIsRecording(true);
       setRecordDuration(0);
-      recordInterval.current = setInterval(() => setRecordDuration(d => d + 1), 1000);
+      recordInterval.current = setInterval(() => {
+        setRecordDuration(d => d + 1);
+      }, 1000);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
       console.error('Record start error:', e);
@@ -371,10 +370,7 @@ export default function ChatScreen() {
 
   const stopRecording = async (shouldCancel: boolean = false, andPreview: boolean = false) => {
     try {
-      if (!recording) return;
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      const uri = await walkieStopRecording();
       setIsRecording(false);
       setIsRecordingLocked(false);
       if (recordInterval.current) clearInterval(recordInterval.current);
@@ -847,7 +843,7 @@ export default function ChatScreen() {
                             if (y < -80 && !isRecordingLocked) {
                               setIsRecordingLocked(true);
                               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                              Animated.spring(slideY, { toValue: 0, useNativeDriver: true }).start();
+                              Animated.spring(slideY, { toValue: 0, useNativeDriver: Platform.OS !== 'web' }).start();
                             }
                           }}
                           onHandlerStateChange={(e) => {
@@ -859,8 +855,8 @@ export default function ChatScreen() {
                               const shouldCancel = e.nativeEvent.translationX < -100;
                               stopRecording(shouldCancel);
                               Animated.parallel([
-                                Animated.spring(slideX, { toValue: 0, useNativeDriver: true }),
-                                Animated.spring(slideY, { toValue: 0, useNativeDriver: true }),
+                                Animated.spring(slideX, { toValue: 0, useNativeDriver: false }),
+                                Animated.spring(slideY, { toValue: 0, useNativeDriver: false }),
                               ]).start();
                             }
                           }}
