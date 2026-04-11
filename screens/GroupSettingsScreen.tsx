@@ -8,12 +8,13 @@ import {
   TextInput,
   Alert,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import { useStore, GroupMember } from '../store/useStore';
+import { useStore, GroupMember, Profile } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 
 export default function GroupSettingsScreen() {
@@ -30,6 +31,11 @@ export default function GroupSettingsScreen() {
   const [name, setName] = useState(group?.name || '');
   const [emoji, setEmoji] = useState(group?.cover_emoji || '👥');
   const [saving, setSaving] = useState(false);
+
+  // Search States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Profile[]>([]);
+  const [searching, setSearching] = useState(false);
 
   const handleUpdate = async () => {
     if (!group || !name.trim()) return;
@@ -110,6 +116,53 @@ export default function GroupSettingsScreen() {
     ]);
   };
 
+  const searchUsers = async (q: string) => {
+    setSearchQuery(q);
+    if (q.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .neq('id', session?.user?.id)
+      .or(`username.ilike.%${q}%,display_name.ilike.%${q}%`)
+      .limit(5);
+    
+    setSearchResults(data as Profile[] || []);
+    setSearching(false);
+  };
+
+  const addMember = async (p: Profile) => {
+    if (!group) return;
+    // Check if already in group
+    if (members.some(m => m.user_id === p.id)) {
+      Alert.alert('Already Member', `${p.display_name} is already in the group.`);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('group_members')
+        .insert({
+          group_id: group.id,
+          user_id: p.id,
+          role: 'member'
+        })
+        .select('*, profile:profiles(*)')
+        .single();
+      
+      if (error) throw error;
+      setGroupMembers(group.id, [...members, data as any]);
+      setSearchQuery('');
+      setSearchResults([]);
+      Alert.alert('Member Added', `${p.display_name} has been added to the group.`);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  };
+
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
@@ -147,6 +200,37 @@ export default function GroupSettingsScreen() {
 
         <View style={styles.section}>
            <Text style={styles.sectionLabel}>Members ({members.length})</Text>
+           
+           {isHostOrMod && (
+             <View style={[styles.card, { marginBottom: 12, paddingBottom: 10 }]}>
+                <View style={styles.searchRow}>
+                   <Ionicons name="search" size={18} color="#8C6246" />
+                   <TextInput
+                      style={styles.searchInput}
+                      placeholder="Add member by name..."
+                      value={searchQuery}
+                      onChangeText={searchUsers}
+                      placeholderTextColor="#B5947A"
+                   />
+                   {searching && <ActivityIndicator size="small" color="#8C6246" />}
+                </View>
+
+                {searchResults.length > 0 && (
+                  <View style={styles.resultsList}>
+                    {searchResults.map(p => (
+                      <TouchableOpacity key={p.id} style={styles.resultItem} onPress={() => addMember(p)}>
+                         <View style={styles.resultInfo}>
+                            <Text style={styles.resultName}>{p.display_name || p.username}</Text>
+                            <Text style={styles.resultSub}>@{p.username}</Text>
+                         </View>
+                         <Ionicons name="add-circle" size={24} color="#C4A882" />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+             </View>
+           )}
+
            <View style={styles.card}>
               {members.map(m => (
                 <View key={m.id} style={styles.memberRow}>
@@ -210,4 +294,12 @@ const styles = StyleSheet.create({
 
   leaveBtn: { borderRadius: 18, borderWidth: 1.5, borderColor: '#B5947A', paddingVertical: 16, alignItems: 'center' },
   leaveBtnText: { fontSize: 14, fontWeight: '800', color: '#B5947A' },
+
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(0,0,0,0.03)', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
+  searchInput: { flex: 1, fontSize: 13, color: '#3D2B1F', fontWeight: '600' },
+  resultsList: { marginTop: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.05)' },
+  resultItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.02)' },
+  resultInfo: { gap: 2 },
+  resultName: { fontSize: 14, fontWeight: '700', color: '#3D2B1F' },
+  resultSub: { fontSize: 10, color: '#B5947A', fontWeight: '600' },
 });
