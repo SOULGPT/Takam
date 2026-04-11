@@ -45,6 +45,7 @@ type Message = {
   is_pinned?: boolean;
   media_url?: string;
   media_type?: 'text' | 'image' | 'audio';
+  expires_at?: string;
 };
 
 // ── Audio Bubble Helper ──────────────────────────────────────────────────────
