@@ -21,7 +21,7 @@ import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-nati
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { createAudioPlayer } from 'expo-audio';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
@@ -1045,7 +1045,11 @@ export default function ChatScreen() {
             {/* 3. Actions (Mic/Send) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8, paddingBottom: 6 }}>
               {!inputText.trim() && !selectedImage && (
-                <TouchableOpacity style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DB4B4B', justifyContent: 'center', alignItems: 'center' }} onPress={startRecording}>
+                <TouchableOpacity 
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DB4B4B', justifyContent: 'center', alignItems: 'center' }} 
+                  onPressIn={startRecording}
+                  onPressOut={() => stopRecording(false, true)}
+                >
                   <Ionicons name="mic" size={18} color="#FFF" />
                 </TouchableOpacity>
               )}

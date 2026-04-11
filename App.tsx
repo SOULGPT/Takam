@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import './global.css';
 import { ActivityIndicator, View, StyleSheet, AppState, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { supabase } from './lib/supabase';

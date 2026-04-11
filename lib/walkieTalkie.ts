@@ -1,7 +1,7 @@
 import { createAudioPlayer, useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
-import * as FileSystem from 'expo-file-system/legacy';
+import * as FileSystem from 'expo-file-system';
 
 let recordingInstance: any = null;
 
