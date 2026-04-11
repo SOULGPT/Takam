@@ -12,12 +12,19 @@ export const requestMicrophonePermission = async () => {
 
 export const startRecording = async () => {
   try {
+    // 1. Check permissions first
+    const hasPermission = await requestMicrophonePermission();
+    if (!hasPermission) {
+      console.warn('Microphone permission not granted');
+      return false;
+    }
+
     if (recordingInstance) {
        try { await recordingInstance.stop(); } catch (e) { console.debug('Recorder already stopped'); }
        recordingInstance = null;
     }
 
-    // New AudioModule config
+    // 2. Configure Audio Session for Recording
     await AudioModule.setAudioModeAsync({
       allowsRecording: true,
       playsInSilentMode: true,
@@ -25,6 +32,7 @@ export const startRecording = async () => {
       interruptionMode: 'duckOthers',
     });
 
+    // 3. Initialize and Prepare
     recordingInstance = new AudioModule.AudioRecorder(RecordingPresets.LOW_QUALITY);
     await recordingInstance.prepareToRecordAsync();
     recordingInstance.record();

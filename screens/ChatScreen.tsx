@@ -499,7 +499,8 @@ export default function ChatScreen() {
   const uploadFile = async (uri: string, type: 'image' | 'audio') => {
     if (!activeBondId || !session?.user) return null;
     try {
-      const ext = type === 'image' ? 'jpg' : 'm4a';
+      const ext = uri.split('.').pop()?.toLowerCase() || (type === 'image' ? 'jpg' : 'm4a');
+      const mimeType = type === 'image' ? 'image/jpeg' : (ext === 'webm' ? 'audio/webm' : 'audio/m4a');
       const path = `${activeBondId}/${Date.now()}.${ext}`;
 
       let blob: Blob;
@@ -510,12 +511,12 @@ export default function ChatScreen() {
         const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
         const { decode } = await import('../lib/walkieTalkie');
         const buffer = decode(base64);
-        blob = new Blob([buffer], { type: type === 'image' ? 'image/jpeg' : 'audio/m4a' });
+        blob = new Blob([buffer], { type: mimeType });
       }
 
       const { data, error } = await supabase.storage
         .from('chat-media')
-        .upload(path, blob, { contentType: type === 'image' ? 'image/jpeg' : 'audio/m4a' });
+        .upload(path, blob, { contentType: mimeType });
 
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(data.path);
@@ -551,16 +552,20 @@ export default function ChatScreen() {
   const startRecording = async () => {
     try {
       const started = await walkieStartRecording();
-      if (!started) return;
+      if (!started) {
+        Alert.alert('Microphone Needed', 'Please enable microphone access in your settings to send voice notes.');
+        return;
+      }
 
       setIsRecording(true);
       setRecordDuration(0);
       recordInterval.current = setInterval(() => {
-        setRecordDuration(d => d + 1);
+        setRecordDuration((d: number) => d + 1);
       }, 1000);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
       console.error('Record start error:', e);
+      Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
     }
   };
 
@@ -685,7 +690,7 @@ export default function ChatScreen() {
       media_url: finalMediaUrl,
       media_type: finalMediaType,
     };
-    setMessages((prev) => [newMsg, ...prev]);
+    setMessages((prev: Message[]) => [newMsg, ...prev]);
     const currentReplyTo = replyTarget?.id || null;
     setReplyTarget(null);
 
@@ -708,12 +713,12 @@ export default function ChatScreen() {
         throw error;
       }
       if (data) {
-        setMessages((prev) => prev.map((m) => (m.id === optId ? (data as Message) : m)));
+        setMessages((prev: Message[]) => prev.map((m: Message) => (m.id === optId ? (data as Message) : m)));
       }
     } catch (e: any) {
       console.error('Full Send Error Details:', e);
       Alert.alert('Send Failed', `Couldn't send your message: ${e.message || 'Unknown error'}`);
-      setMessages((prev) => prev.filter((m) => m.id !== optId));
+      setMessages((prev: Message[]) => prev.filter((m: Message) => m.id !== optId));
     } finally {
       setSending(false);
     }
