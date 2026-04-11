@@ -508,7 +508,7 @@ export default function ChatScreen() {
         const response = await fetch(uri);
         blob = await response.blob();
       } else {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
         const { decode } = await import('../lib/walkieTalkie');
         const buffer = decode(base64);
         blob = new Blob([buffer], { type: mimeType });

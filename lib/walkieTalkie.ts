@@ -74,7 +74,7 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
       blob = await response.blob();
     } else {
       // Use FileSystem for potentially faster access on Native
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const buffer = decode(base64);
       blob = new Blob([buffer], { type: actualExt === 'webm' ? 'audio/webm' : 'audio/m4a' });
     }
