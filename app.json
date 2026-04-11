@@ -46,7 +46,10 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "notification": {
+        "vapidPublicKey": "PLACEHOLDER_VAPID_KEY"
+      }
     },
     "plugins": [
       "expo-secure-store",

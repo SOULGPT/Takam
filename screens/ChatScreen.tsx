@@ -20,7 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { createAudioPlayer } from 'expo-audio';
+import { createAudioPlayer, useAudioRecorder, useAudioRecorderState, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -31,7 +31,7 @@ import { useStore, BOND_META, CHAT_THEMES, ChatThemeOption } from '../store/useS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
 import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
-import { startRecording as walkieStartRecording, stopRecording as walkieStopRecording, playBurst } from '../lib/walkieTalkie';
+import { playBurst } from '../lib/walkieTalkie';
 import chatPattern from '../assets/chat-bg-pattern.png';
 import { AVATARS } from '../utils/avatars';
 
@@ -252,6 +252,8 @@ const ChatBubble = React.memo(({
 );
 
 export default function ChatScreen() {
+  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
+  const recorderState = useAudioRecorderState(recorder, 500);
   const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
   const { session, profile, activeBondId, bonds, bondMembers, updateBond } = useStore();
@@ -550,28 +552,35 @@ export default function ChatScreen() {
   };
 
   const startRecording = async () => {
+    setIsRecording(true);
+    setRecordDuration(0);
     try {
-      const started = await walkieStartRecording();
-      if (!started) {
+      const { status } = await requestRecordingPermissionsAsync();
+      if (status !== 'granted') {
+        setIsRecording(false);
         Alert.alert('Microphone Needed', 'Please enable microphone access in your settings to send voice notes.');
         return;
       }
 
-      setIsRecording(true);
-      setRecordDuration(0);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      
       recordInterval.current = setInterval(() => {
         setRecordDuration((d: number) => d + 1);
       }, 1000);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e) {
       console.error('Record start error:', e);
+      setIsRecording(false);
       Alert.alert('Recording Error', 'Failed to start recording. Please try again.');
     }
   };
 
   const stopRecording = async (shouldCancel: boolean = false, andPreview: boolean = false) => {
     try {
-      const uri = await walkieStopRecording();
+      await recorder.stop();
+      const uri = recorder.uri;
+      
       setIsRecording(false);
       setIsRecordingLocked(false);
       if (recordInterval.current) clearInterval(recordInterval.current);
@@ -593,6 +602,7 @@ export default function ChatScreen() {
       }
     } catch (err) {
       console.error('Stop recording error', err);
+      setIsRecording(false);
     }
   };
 
@@ -1047,8 +1057,7 @@ export default function ChatScreen() {
               {!inputText.trim() && !selectedImage && (
                 <TouchableOpacity 
                   style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DB4B4B', justifyContent: 'center', alignItems: 'center' }} 
-                  onPressIn={startRecording}
-                  onPressOut={() => stopRecording(false, true)}
+                  onPress={startRecording}
                 >
                   <Ionicons name="mic" size={18} color="#FFF" />
                 </TouchableOpacity>

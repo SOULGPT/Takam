@@ -5,99 +5,10 @@ import * as FileSystem from 'expo-file-system';
 
 let recordingInstance: any = null;
 
-export const requestMicrophonePermission = async () => {
-  const { status } = await AudioModule.requestRecordingPermissionsAsync();
-  return status === 'granted';
-};
+// The imperative AudioRecorder constructor is not supported on web in SDK 54.
+// Recording logic has been moved to the useAudioRecorder hook in ChatScreen.tsx.
 
-export const startRecording = async () => {
-  try {
-    // 1. Check permissions first
-    const hasPermission = await requestMicrophonePermission();
-    if (!hasPermission) {
-      console.warn('Microphone permission not granted');
-      return false;
-    }
-
-    if (recordingInstance) {
-       try { await recordingInstance.stop(); } catch (e) { console.debug('Recorder already stopped'); }
-       recordingInstance = null;
-    }
-
-    // 2. Configure Audio Session for Recording
-    await AudioModule.setAudioModeAsync({
-      allowsRecording: true,
-      playsInSilentMode: true,
-      shouldPlayInBackground: true,
-      interruptionMode: 'duckOthers',
-    });
-
-    // 3. Initialize and Prepare
-    recordingInstance = new AudioModule.AudioRecorder(RecordingPresets.LOW_QUALITY);
-    await recordingInstance.prepareToRecordAsync();
-    recordingInstance.record();
-    return true;
-  } catch (err) {
-    console.error('Failed to start recording', err);
-    recordingInstance = null;
-    throw err;
-  }
-};
-
-export const stopRecording = async () => {
-  if (!recordingInstance) return null;
-
-  try {
-    await recordingInstance.stop();
-    const uri = recordingInstance.uri;
-    recordingInstance = null;
-    return uri;
-  } catch (err) {
-    console.error('Failed to stop recording', err);
-    recordingInstance = null;
-    throw err;
-  }
-};
-
-export const stopRecordingAndUpload = async (bondId: string, userId: string) => {
-  const uri = await stopRecording();
-  if (!uri) return null;
-
-  try {
-    const actualExt = uri.split('.').pop() || 'm4a';
-    const fileName = `burst_${bondId}_${Date.now()}.${actualExt}`;
-    const filePath = `${bondId}/${fileName}`;
-
-    let blob: Blob;
-    if (Platform.OS === 'web') {
-      const response = await fetch(uri);
-      blob = await response.blob();
-    } else {
-      // Use FileSystem for potentially faster access on Native
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-      const buffer = decode(base64);
-      blob = new Blob([buffer], { type: actualExt === 'webm' ? 'audio/webm' : 'audio/m4a' });
-    }
-
-    const { data, error } = await supabase.storage
-      .from('walkie-bursts')
-      .upload(filePath, blob, {
-        contentType: actualExt === 'webm' ? 'audio/webm' : 'audio/m4a',
-        upsert: true
-      });
-
-    if (error) throw error;
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('walkie-bursts')
-      .getPublicUrl(filePath);
-
-    return publicUrl;
-  } catch (err) {
-    console.error('Failed to upload recording', err);
-    throw err;
-  }
-};
+// Recording and uploading logic has been moved to ChatScreen.tsx to utilize useAudioRecorder.
 
 export const playBurst = async (url: string, onFinish?: () => void) => {
   try {
