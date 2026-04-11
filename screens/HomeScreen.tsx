@@ -63,7 +63,7 @@ const VIBES = [
 
 export default function HomeScreen() {
   const nav = useNavigation<any>();
-  const { profile, bonds, bondMembers, activeBondId, setActiveBondId, unreadCounts } = useStore();
+  const { profile, bonds, bondMembers, activeBondId, setActiveBondId, unreadCounts, groups, groupUnreadCounts, setActiveGroupId, activeGroupId } = useStore();
   const [sending, setSending] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
   const [isWalkieActive, setIsWalkieActive] = useState(false);
@@ -380,6 +380,42 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Group Bonds Section */}
+        {groups.length > 0 && (
+          <View style={[styles.bondsSection, { marginTop: 10 }]}>
+            <View style={styles.bondsHeader}>
+              <Text style={styles.bondsLabel}>Group Bonds</Text>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.bondSwitcherScroll}>
+              {groups.map((g) => {
+                const isActive = g.id === activeGroupId;
+                const unread = groupUnreadCounts[g.id] || 0;
+                return (
+                  <TouchableOpacity key={g.id} style={styles.bondMember} onPress={() => setActiveGroupId(g.id)} activeOpacity={0.8}>
+                    <View>
+                      <BlobAvatar 
+                        initials={g.cover_emoji}
+                        color="#3D2B1F"
+                        isActive={isActive}
+                        size={isActive ? 90 : 75}
+                      />
+                      {unread > 0 && (
+                        <View style={[styles.unreadBadge, isActive && { top: 0, right: 0 }]}>
+                          <Text style={styles.unreadBadgeText}>
+                            {unread > 99 ? '99+' : unread}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.bondMemberName, isActive && { color: '#C9705A', fontWeight: '800' }]}>{g.name}</Text>
+                    <Text style={styles.bondMemberRole}>Group</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         <View style={styles.bondsSection}>
           <View style={styles.bondsHeader}>
             <Text style={styles.bondsLabel}>Active Bonds</Text>
@@ -511,12 +547,21 @@ export default function HomeScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      <TouchableOpacity style={styles.chatButton} onPress={() => nav.navigate('Chat')} activeOpacity={0.8}>
+      <TouchableOpacity 
+        style={styles.chatButton} 
+        onPress={() => nav.navigate(activeGroupId ? 'GroupChat' : 'Chat')} 
+        activeOpacity={0.8}
+      >
         <Text style={styles.chatIcon}>💬</Text>
-        <Text style={styles.chatBtnText}>Open Chat</Text>
+        <Text style={styles.chatBtnText}>Open {activeGroupId ? 'Group Chat' : 'Chat'}</Text>
         {activeBond && unreadCounts[activeBond.id] > 0 && (
           <View style={styles.chatUnreadBadge}>
             <Text style={styles.chatUnreadBadgeText}>{unreadCounts[activeBond.id]}</Text>
+          </View>
+        )}
+        {activeGroupId && groupUnreadCounts[activeGroupId] > 0 && (
+          <View style={styles.chatUnreadBadge}>
+            <Text style={styles.chatUnreadBadgeText}>{groupUnreadCounts[activeGroupId]}</Text>
           </View>
         )}
       </TouchableOpacity>

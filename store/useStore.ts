@@ -188,6 +188,26 @@ export interface Profile {
   timezone?: string;
 }
 
+export interface Group {
+  id: string;
+  name: string;
+  description?: string;
+  created_by: string;
+  group_code: string;
+  cover_emoji: string;
+  created_at: string;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: 'host' | 'moderator' | 'member';
+  joined_at: string;
+  status: 'active' | 'removed' | 'left';
+  profile?: Profile; // Populated Profile
+}
+
 interface AppState {
   session: Session | null;
   profile: Profile | null;
@@ -195,11 +215,18 @@ interface AppState {
   // ── Multi-bond state ──────────────────────────────────────────────────────
   bonds: Bond[];                        // all pending + active bonds
   bondMembers: Record<string, Profile>; // partner Profile, keyed by bond_id
-  activeBondId: string | null;          // which bond Home/Gift operates on
+  activeBondId: string | null;
+  activeGroupId: string | null;
+          // which bond Home/Gift operates on
 
   // ── Unread State ────────────────────────────────────────────────────────
   unreadCounts: Record<string, number>; // bond_id -> unread_count
   userBondThemes: Record<string, string>; // bond_id -> theme_key
+
+  // ── Group State ──────────────────────────────────────────────────────────
+  groups: Group[];
+  groupMembers: Record<string, GroupMember[]>; // group_id -> members
+  groupUnreadCounts: Record<string, number>; // group_id -> unread_count
 
   // ── Actions ───────────────────────────────────────────────────────────────
   setSession: (session: Session | null) => void;
@@ -212,11 +239,20 @@ interface AppState {
 
   setBondMember: (bondId: string, profile: Profile) => void;
   setActiveBondId: (id: string | null) => void;
+  setActiveGroupId: (id: string | null) => void;
 
   setUnreadCounts: (counts: Record<string, number>) => void;
   incrementUnread: (bondId: string, amount?: number) => void;
   clearUnread: (bondId: string) => void;
   setUserBondTheme: (bondId: string, theme: string) => void;
+
+  setGroups: (groups: Group[]) => void;
+  addGroup: (group: Group) => void;
+  updateGroup: (group: Group) => void;
+  removeGroup: (groupId: string) => void;
+  setGroupMembers: (groupId: string, members: GroupMember[]) => void;
+  setGroupUnreadCounts: (counts: Record<string, number>) => void;
+  clearGroupUnread: (groupId: string) => void;
 
   reset: () => void;
 }
@@ -227,8 +263,12 @@ export const useStore = create<AppState>((set) => ({
   bonds: [],
   bondMembers: {},
   activeBondId: null,
+  activeGroupId: null,
   unreadCounts: {},
   userBondThemes: {},
+  groups: [],
+  groupMembers: {},
+  groupUnreadCounts: {},
 
   setSession: (session) => set({ session }),
   setProfile: (profile) => set({ profile }),
@@ -261,7 +301,8 @@ export const useStore = create<AppState>((set) => ({
       bondMembers: { ...state.bondMembers, [bondId]: profile },
     })),
 
-  setActiveBondId: (id) => set({ activeBondId: id }),
+  setActiveBondId: (id) => set({ activeBondId: id, activeGroupId: null }), // Clear group when selecting bond
+  setActiveGroupId: (id) => set({ activeGroupId: id, activeBondId: null }), // Clear bond when selecting group
 
   setUnreadCounts: (counts) => set({ unreadCounts: counts }),
 
@@ -289,5 +330,33 @@ export const useStore = create<AppState>((set) => ({
       },
     })),
 
-  reset: () => set({ session: null, profile: null, bonds: [], bondMembers: {}, activeBondId: null, unreadCounts: {}, userBondThemes: {} }),
+  setGroups: (groups) => set({ groups }),
+  addGroup: (group) => set((state) => ({ groups: [group, ...state.groups] })),
+  updateGroup: (group) => set((state) => ({
+    groups: state.groups.map(g => g.id === group.id ? group : g)
+  })),
+  removeGroup: (groupId) => set((state) => ({
+    groups: state.groups.filter(g => g.id !== groupId)
+  })),
+  setGroupMembers: (groupId, members) => set((state) => ({
+    groupMembers: { ...state.groupMembers, [groupId]: members }
+  })),
+  setGroupUnreadCounts: (counts) => set({ groupUnreadCounts: counts }),
+  clearGroupUnread: (groupId) => set((state) => ({
+    groupUnreadCounts: { ...state.groupUnreadCounts, [groupId]: 0 }
+  })),
+
+  reset: () => set({ 
+    session: null, 
+    profile: null, 
+    bonds: [], 
+    bondMembers: {}, 
+    activeBondId: null, 
+    activeGroupId: null,
+    unreadCounts: {}, 
+    userBondThemes: {},
+    groups: [],
+    groupMembers: {},
+    groupUnreadCounts: {},
+  }),
 }));

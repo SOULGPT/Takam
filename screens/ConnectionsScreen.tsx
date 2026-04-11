@@ -217,7 +217,7 @@ function TypePicker({
   );
 }
 
-type Mode = 'list' | 'typeSelect' | 'create' | 'join' | 'waiting';
+type Mode = 'list' | 'typeSelect' | 'create' | 'join' | 'waiting' | 'createGroup' | 'joinGroup';
 
 export default function ConnectionsScreen() {
   const nav = useNavigation<any>();
@@ -230,12 +230,16 @@ export default function ConnectionsScreen() {
     addBond,
     updateBond,
     removeBond,
+    addGroup,
   } = useStore();
 
   const [mode, setMode] = useState<Mode>('list');
   const [selectedType, setSelectedType] = useState<BondType>('partner');
   const [joinCode, setJoinCode] = useState('');
+  const [groupName, setGroupName] = useState('');
+  const [groupEmoji, setGroupEmoji] = useState('👥');
   const [pendingBond, setPendingBond] = useState<Bond | null>(null);
+  const [pendingGroup, setPendingGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
@@ -306,6 +310,80 @@ export default function ConnectionsScreen() {
       Alert.alert('Request Sent! ⏳', `We notified them to approve your ${BOND_META[updated.bond_type as BondType]?.label} bond request.`);
     } catch (e: any) {
       Alert.alert('Error', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateGroup = async () => {
+    if (!session?.user || !groupName.trim()) return;
+    setLoading(true);
+    try {
+      // 1. Helper to generate code locally (Mirroring DB fallback)
+      const code = generateBondCode();
+      
+      // 2. Create the Group
+      const { data: group, error: gErr } = await supabase
+        .from('groups')
+        .insert({
+          name: groupName,
+          created_by: session.user.id,
+          group_code: code,
+          cover_emoji: groupEmoji,
+        })
+        .select()
+        .single();
+      
+      if (gErr) throw gErr;
+
+      // 3. Add current user as Host
+      await supabase.from('group_members').insert({
+        group_id: group.id,
+        user_id: session.user.id,
+        role: 'host',
+      });
+
+      addGroup(group as Group);
+      setPendingGroup(group as Group);
+      setMode('waiting');
+    } catch (e: any) {
+      Alert.alert('Group Error', e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinGroup = async () => {
+    if (!session?.user || joinCode.length !== 6) return;
+    setLoading(true);
+    try {
+      // 1. Find group by code
+      const { data: group, error: fErr } = await supabase
+        .from('groups')
+        .select()
+        .eq('group_code', joinCode.toUpperCase())
+        .maybeSingle();
+      
+      if (fErr) throw fErr;
+      if (!group) throw new Error('Invalid group code. Please check and try again.');
+
+      // 2. Join as member
+      const { error: jErr } = await supabase
+        .from('group_members')
+        .insert({
+          group_id: group.id,
+          user_id: session.user.id,
+          role: 'member',
+        });
+      
+      if (jErr) throw new Error('You are already a member or could not join.');
+
+      addGroup(group as Group);
+      setJoinCode('');
+      setMode('list');
+      Alert.alert('Welcome! 🏘️', `You've joined the group: ${group.name}`);
+    } catch (e: any) {
+      Alert.alert('Join Error', e.message);
     } finally {
       setLoading(false);
     }
@@ -482,6 +560,24 @@ export default function ConnectionsScreen() {
             >
               <Text style={styles.joinBtnText}>🔗  I have a code to enter</Text>
             </TouchableOpacity>
+
+            <View style={{ height: 1.5, backgroundColor: '#D9BC8A33', marginVertical: 8 }} />
+
+            <TouchableOpacity
+              style={[styles.createBtn, { backgroundColor: '#3D2B1F' }]}
+              onPress={() => setMode('createGroup')}
+            >
+               <View style={[styles.createBtnGrad, { backgroundColor: '#3D2B1F' }]}>
+                 <Text style={styles.createBtnText}>👥  Create Group Bond</Text>
+               </View>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={[styles.joinBtn, { borderColor: '#3D2B1F' }]}
+              onPress={() => setMode('joinGroup')}
+            >
+              <Text style={[styles.joinBtnText, { color: '#3D2B1F' }]}>🏘️  Join/Search Group</Text>
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </View>
@@ -553,6 +649,122 @@ export default function ConnectionsScreen() {
               Done — go back to connections
             </Text>
           </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'waiting' && pendingGroup) {
+    return (
+      <View style={styles.root}>
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+        <View style={styles.flowContent}>
+          <Text style={styles.flowTitle}>Group is Ready! 🏘️</Text>
+          <Text style={styles.flowSub}>
+            Share this code with your group members. Anyone with this code can join.
+          </Text>
+
+          <View style={styles.waitCard}>
+            <Text style={styles.waitType}>{pendingGroup.cover_emoji}  {pendingGroup.name}</Text>
+            <Text style={styles.waitCodeLabel}>GROUP BOND CODE</Text>
+            <Text style={styles.waitCode}>{pendingGroup.group_code}</Text>
+            <TouchableOpacity
+              style={styles.copyBtn}
+              onPress={() => copyCode(pendingGroup.group_code)}
+            >
+              <Text style={styles.copyBtnText}>📋  Copy Group Code</Text>
+            </TouchableOpacity>
+            <Text style={styles.waitNote}>People can join instantly using this code.</Text>
+          </View>
+
+          <TouchableOpacity onPress={() => { setPendingGroup(null); setMode('list'); }}>
+            <Text style={[styles.backText, { textAlign: 'center', marginTop: 8 }]}>
+              Done — open connections
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'createGroup') {
+    return (
+      <View style={styles.root}>
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+        <View style={styles.flowContent}>
+          <TouchableOpacity onPress={() => setMode('typeSelect')} style={styles.backRow}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.flowTitle}>Create a Group 🏘️</Text>
+          <Text style={styles.flowSub}>Bring everyone together in a shared bond space.</Text>
+          
+          <View style={styles.joinCard}>
+             <TextInput
+              style={[styles.codeInput, { fontSize: 24, letterSpacing: 1 }]}
+              value={groupName}
+              onChangeText={setGroupName}
+              placeholder="Group Name"
+              placeholderTextColor="#B5947A"
+            />
+             <TextInput
+              style={[styles.codeInput, { marginTop: 12, fontSize: 32 }]}
+              value={groupEmoji}
+              onChangeText={setGroupEmoji}
+              placeholder="👥"
+              maxLength={2}
+            />
+            <TouchableOpacity
+              style={[styles.generateBtn, !groupName.trim() && styles.generateBtnDisabled]}
+              onPress={handleCreateGroup}
+              disabled={loading || !groupName.trim()}
+            >
+              <LinearGradient
+                colors={['#3D2B1F', '#1A1A1A']}
+                style={styles.generateBtnGrad}
+              >
+                {loading ? <ActivityIndicator color="#FDFAF4" /> : <Text style={styles.generateBtnText}>Create Group ✦</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'joinGroup') {
+    return (
+      <View style={styles.root}>
+        <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
+        <View style={styles.flowContent}>
+          <TouchableOpacity onPress={() => setMode('typeSelect')} style={styles.backRow}>
+            <Text style={styles.backText}>← Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.flowTitle}>Join a Group 🔗</Text>
+          <Text style={styles.flowSub}>Enter the 6-character Group Bond code.</Text>
+
+          <View style={styles.joinCard}>
+            <TextInput
+              style={styles.codeInput}
+              value={joinCode}
+              onChangeText={(t) => setJoinCode(t.toUpperCase())}
+              maxLength={6}
+              autoCapitalize="characters"
+              placeholder="GROUP1"
+              placeholderTextColor="#B5947A"
+            />
+            <TouchableOpacity
+              style={[styles.generateBtn, joinCode.length !== 6 && styles.generateBtnDisabled]}
+              onPress={handleJoinGroup}
+              disabled={loading || joinCode.length !== 6}
+            >
+              <LinearGradient
+                colors={joinCode.length === 6 ? ['#3D2B1F', '#1A1A1A'] : ['#D9BC8A', '#C5A870']}
+                style={styles.generateBtnGrad}
+              >
+                {loading ? <ActivityIndicator color="#FDFAF4" /> : <Text style={styles.generateBtnText}>Join Group 🏘️</Text>}
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );

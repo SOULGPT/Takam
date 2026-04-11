@@ -4,12 +4,14 @@ import { ActivityIndicator, View, StyleSheet, AppState, Platform } from 'react-n
 import { NavigationContainer } from '@react-navigation/native';
 import { supabase } from './lib/supabase';
 import * as Linking from 'expo-linking';
-import { useStore, Bond, Profile } from './store/useStore';
+import { useStore, Bond, Profile, Group, GroupMember } from './store/useStore';
 import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import TabNavigator from './navigation/TabNavigator';
 import ChatScreen from './screens/ChatScreen';
+import GroupChatScreen from './screens/GroupChatScreen';
+import GroupSettingsScreen from './screens/GroupSettingsScreen';
 import { Session } from '@supabase/supabase-js';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AdminNavigator from './navigation/AdminNavigator';
@@ -45,6 +47,8 @@ function AppCore() {
     updateBond,
     activeBondId,
     bonds,
+    setGroups,
+    setActiveGroupId,
   } = useStore();
   const [loading, setLoading] = useState(true);
   const [authFlow, setAuthFlow] = useState<AuthFlow>('landing');
@@ -88,7 +92,9 @@ function AppCore() {
   useEffect(() => {
     if (!session?.user) {
       setBonds([]);
+      setGroups([]);
       setActiveBondId(null);
+      setActiveGroupId(null);
       setProfile(null);
       setAuthFlow('landing');
       return;
@@ -148,6 +154,17 @@ function AppCore() {
             .filter((b) => b.status === 'active')
             .map((b) => fetchMember(b, session.user.id)),
         );
+
+        // 4. Fetch GROUPS
+        const { data: groupData } = await supabase
+          .from('groups')
+          .select('*, group_members!inner(user_id)')
+          .eq('group_members.user_id', session.user.id)
+          .eq('group_members.status', 'active');
+        
+        if (groupData) {
+          setGroups(groupData as Group[]);
+        }
 
         // 4. Fetch initial Unread Counts & Local Themes
         try {
@@ -269,6 +286,36 @@ function AppCore() {
           }
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'group_messages' },
+        (payload) => {
+          const state = useStore.getState();
+          // Only increment if we are not currently in that group chat
+          if (payload.new.sender_id !== session.user.id && state.activeGroupId !== payload.new.group_id) {
+             const currentUnread = state.groupUnreadCounts[payload.new.group_id] || 0;
+             state.setGroupUnreadCounts({
+               ...state.groupUnreadCounts,
+               [payload.new.group_id]: currentUnread + 1
+             });
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'group_members', filter: `user_id=eq.${session.user.id}` },
+        async (payload) => {
+          // We were added to a group!
+          const { data: grp } = await supabase
+            .from('groups')
+            .select('*')
+            .eq('id', payload.new.group_id)
+            .single();
+          if (grp) {
+            useStore.getState().addGroup(grp as Group);
+          }
+        }
+      )
       .subscribe();
 
     return () => {
@@ -364,6 +411,9 @@ function AppCore() {
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="Main" component={TabNavigator} />
         <RootStack.Screen name="Chat" component={ChatScreen} />
+        <RootStack.Screen name="GroupChat" component={GroupChatScreen} />
+        <RootStack.Screen name="GroupSettings" component={GroupSettingsScreen} />
+        <RootStack.Screen name="Admin" component={AdminNavigator} />
         <RootStack.Screen name="Upgrade" component={UpgradeScreen} options={{ presentation: 'modal' }} />
       </RootStack.Navigator>
     </NavigationContainer>
