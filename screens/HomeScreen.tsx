@@ -26,10 +26,8 @@ import { shadow } from '../lib/theme/shadows';
 
 // New Velvet Pulse Components
 import BlobAvatar from '../components/BlobAvatar';
-import VibeCard from '../components/VibeCard';
-import WalkieTalkieView from '../components/WalkieTalkieView';
 import * as FileSystem from 'expo-file-system';
-import { useAudioRecorder, requestRecordingPermissionsAsync, AudioModule } from 'expo-audio';
+import { useAudioRecorder, requestRecordingPermissionsAsync, AudioModule, RecordingPresets } from 'expo-audio';
 import { playBurst, decode } from '../lib/walkieTalkie';
 
 // Tap-To-Bond Feature
@@ -65,7 +63,7 @@ const VIBES = [
 
 export default function HomeScreen() {
   const nav = useNavigation<any>();
-  const recorder = useAudioRecorder();
+  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
   const { profile, bonds, bondMembers, activeBondId, setActiveBondId, unreadCounts, groups, groupUnreadCounts, setActiveGroupId, activeGroupId } = useStore();
   const [sending, setSending] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
