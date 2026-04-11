@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { shadow } from '../lib/theme/shadows';
 
 interface VibeCardProps {
   title: string;
@@ -38,11 +39,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    ...shadow('#3D2B1F', { width: 0, height: 4 }, 0.04, 10, 2),
     borderWidth: 1,
     borderColor: 'rgba(217, 188, 138, 0.2)',
   },

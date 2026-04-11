@@ -15,6 +15,15 @@ import AdminNavigator from './navigation/AdminNavigator';
 import UpgradeScreen from './screens/UpgradeScreen';
 import { signInWithGoogle } from './lib/auth/google';
 import { signInWithApple } from './lib/auth/apple';
+import { 
+  useFonts, 
+  CormorantGaramond_400Regular, 
+  CormorantGaramond_700Bold 
+} from '@expo-google-fonts/cormorant-garamond';
+import { 
+  Caveat_400Regular, 
+  Caveat_700Bold 
+} from '@expo-google-fonts/caveat';
 
 const RootStack = createNativeStackNavigator();
 
@@ -38,6 +47,16 @@ function AppCore() {
   } = useStore();
   const [loading, setLoading] = useState(true);
   const [authFlow, setAuthFlow] = useState<AuthFlow>('landing');
+
+  const [fontsLoaded] = useFonts({
+    CormorantGaramond_400Regular,
+    CormorantGaramond_700Bold,
+    Caveat_400Regular,
+    Caveat_700Bold,
+  });
+
+  // ── Auth-flow state machine hooks must be at top level ──────────────────────
+  // (Moving effect declarations above early return)
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', async (nextAppState) => {
@@ -263,7 +282,7 @@ function AppCore() {
   }, []);
 
   // ── Loading spinner ───────────────────────────────────────────────────────
-  if (loading) {
+  if (!fontsLoaded || loading) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color="#C9705A" />

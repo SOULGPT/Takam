@@ -18,6 +18,7 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { useNavigation } from '@react-navigation/native';
 import { AVATARS, MALE_AVATAR_KEYS, FEMALE_AVATAR_KEYS } from '../utils/avatars';
+import { shadow } from '../lib/theme/shadows';
 
 export default function ProfileScreen() {
   const { profile, bonds, bondMembers, activeBondId, setProfile, reset } = useStore();
@@ -310,11 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#C9705A',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 14,
-    elevation: 8,
+    ...shadow('#9B3D2C', { width: 0, height: 6 }, 0.25, 14, 8),
   },
   avatarInitial: { fontSize: 34, fontWeight: '800', color: '#F5ECD7' },
   displayName: { fontSize: 22, fontWeight: '700', color: '#3D2B1F' },
@@ -331,11 +328,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    ...shadow('#3D2B1F', { width: 0, height: 3 }, 0.07, 10, 4),
     gap: 2,
   },
   cardTitle: { fontSize: 16, fontWeight: '700', color: '#3D2B1F', marginBottom: 6 },

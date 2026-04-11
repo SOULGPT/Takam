@@ -49,3 +49,10 @@ yarn-error.*
 .env.local
 supabase/functions/.env
 expo_error.txt
+*.log
+*.txt
+*.json_debug
+bundle_error.json
+export_log*
+expo_full_logs.txt
+expo_error_detail.txt

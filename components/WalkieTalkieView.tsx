@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, DeviceEventEmitter } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, DeviceEventEmitter, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { shadow } from '../lib/theme/shadows';
 
 interface WalkieTalkieViewProps {
   partnerName: string;
@@ -24,8 +25,8 @@ export default function WalkieTalkieView({
     if (isTalking) {
       Animated.loop(
         Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.3, duration: 1000, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: true }),
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
+          Animated.timing(pulseAnim, { toValue: 1, duration: 1000, useNativeDriver: Platform.OS !== 'web' }),
         ])
       ).start();
     } else {
@@ -144,11 +145,7 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     padding: 32,
     alignItems: 'center',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 24 },
-    shadowOpacity: 0.08,
-    shadowRadius: 48,
-    elevation: 4,
+    ...shadow('#3D2B1F', { width: 0, height: 24 }, 0.08, 48, 12),
   },
   statusBox: {
     alignItems: 'center',
@@ -178,11 +175,7 @@ const styles = StyleSheet.create({
     height: 180,
     borderRadius: 90,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
+    ...shadow('#000', { width: 0, height: 10 }, 0.1, 20, 5),
   },
   micBtnGrad: {
     flex: 1,

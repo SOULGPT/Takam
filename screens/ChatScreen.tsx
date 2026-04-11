@@ -20,12 +20,13 @@ import * as Haptics from 'expo-haptics';
 import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { createAudioPlayer } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
+import { shadow } from '../lib/theme/shadows';
 import { useStore, BOND_META, CHAT_THEMES, ChatThemeOption } from '../store/useStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { playSound } from '../lib/sound';
@@ -49,40 +50,34 @@ type Message = {
 // ── Audio Bubble Helper ──────────────────────────────────────────────────────
 const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: any }) => {
   const [playing, setPlaying] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [player] = useState(() => createAudioPlayer(uri));
   const [pos, setPos] = useState(0);
   const [duration, setDuration] = useState(1);
 
   useEffect(() => {
-    return () => { if (sound) sound.unloadAsync(); };
-  }, [sound]);
+    const interval = setInterval(() => {
+      if (player) {
+         setPos(player.currentTime * 1000);
+         setDuration(player.duration * 1000);
+         setPlaying(player.playing);
+      }
+    }, 100);
+    return () => {
+      clearInterval(interval);
+      player.pause();
+      player.remove();
+    };
+  }, [player]);
 
-  const togglePlayback = async () => {
-    if (sound) {
-      if (playing) await sound.pauseAsync();
-      else await sound.playAsync();
-      setPlaying(!playing);
+  const togglePlayback = () => {
+    if (player.playing) {
+      player.pause();
     } else {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true },
-        (status: any) => {
-          if (status.isLoaded) {
-            setPos(status.positionMillis || 0);
-            setDuration(status.durationMillis || 1);
-            if (status.didJustFinish) {
-              setPlaying(false);
-              newSound.setPositionAsync(0);
-            }
-          } else if (status.error) {
-            console.error('Playback error:', status.error);
-          }
-        }
-      );
-      setSound(newSound);
-      setPlaying(true);
+      if (player.currentTime >= player.duration) player.seekTo(0);
+      player.play();
     }
   };
+
 
   const progress = (pos / duration) * 100;
 
@@ -238,6 +233,12 @@ const ChatBubble = React.memo(({
           >
             {renderMediaContent()}
           </TouchableOpacity>
+          <Text style={[
+            styles.bubbleTime,
+            { color: '#888', textAlign: isMe ? 'right' : 'left', marginTop: 2, marginRight: isMe ? 4 : 0, marginLeft: !isMe ? 4 : 0 }
+          ]}>
+            {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
         </View>
       </View>
     </Swipeable>
@@ -266,7 +267,7 @@ export default function ChatScreen() {
   const [recordingPreviewUri, setRecordingPreviewUri] = useState<string | null>(null);
   const [isRecordingLocked, setIsRecordingLocked] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
-  const [previewSound, setPreviewSound] = useState<Audio.Sound | null>(null);
+  const [previewPlayer, setPreviewPlayer] = useState<any>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0)).current;
 
@@ -274,10 +275,15 @@ export default function ChatScreen() {
   const slideY = useRef(new Animated.Value(0)).current;
   const lockAnim = useRef(new Animated.Value(0)).current;
 
-  // Cleanup preview sound
+  // Cleanup preview player
   useEffect(() => {
-    return () => { if (previewSound) previewSound.unloadAsync(); };
-  }, [previewSound]);
+    return () => { 
+      if (previewPlayer) {
+        previewPlayer.pause();
+        previewPlayer.remove();
+      }
+    };
+  }, [previewPlayer]);
 
   // Media State
   const [isRecording, setIsRecording] = useState(false);
@@ -332,15 +338,15 @@ export default function ChatScreen() {
     setContextMenuMsg(msg);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: Platform.OS !== 'web' })
     ]).start();
   };
 
   const closeContextMenu = () => {
     Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(scaleAnim, { toValue: 0, duration: 150, useNativeDriver: true })
+      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(scaleAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' })
     ]).start(() => setContextMenuMsg(null));
   };
 
@@ -496,9 +502,16 @@ export default function ChatScreen() {
       const ext = type === 'image' ? 'jpg' : 'm4a';
       const path = `${activeBondId}/${Date.now()}.${ext}`;
 
-      // Universal upload pattern: works on Web and Native
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      let blob: Blob;
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        const { decode } = await import('../lib/walkieTalkie');
+        const buffer = decode(base64);
+        blob = new Blob([buffer], { type: type === 'image' ? 'image/jpeg' : 'audio/m4a' });
+      }
 
       const { data, error } = await supabase.storage
         .from('chat-media')
@@ -506,11 +519,10 @@ export default function ChatScreen() {
 
       if (error) throw error;
       const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(data.path);
-      console.log('Upload successful! Public URL:', publicUrl);
       return publicUrl;
     } catch (e: any) {
-      console.error('Final Upload Error Context:', e);
-      Alert.alert('Upload Error', `Failed to upload media. ${e.message || 'Check your internet or browser permissions.'}`);
+      console.error('Upload Error:', e);
+      Alert.alert('Upload Error', `Failed to upload media. ${e.message || ''}`);
       return null;
     }
   };
@@ -579,40 +591,43 @@ export default function ChatScreen() {
     }
   };
 
-  const handlePreviewPlay = async () => {
+  const handlePreviewPlay = () => {
     if (!recordingPreviewUri) return;
-    if (previewPlaying && previewSound) {
-      await previewSound.pauseAsync();
-      setPreviewPlaying(false);
-      return;
+    
+    let activePlayer = previewPlayer;
+    if (!activePlayer) {
+      activePlayer = createAudioPlayer(recordingPreviewUri);
+      
+      // Add status listener for cleanup and UI sync
+      activePlayer.addListener('playbackStatusUpdate', (status: any) => {
+        if (status.didJustFinish) {
+          setPreviewPlaying(false);
+          activePlayer?.seekTo(0);
+        }
+      });
+
+      setPreviewPlayer(activePlayer);
     }
 
-    if (previewSound) {
-      await previewSound.playAsync();
-      setPreviewPlaying(true);
+    if (activePlayer.playing) {
+      activePlayer.pause();
+      setPreviewPlaying(false);
     } else {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: recordingPreviewUri },
-        { shouldPlay: true },
-        (status: any) => {
-          if (status.isLoaded && status.didJustFinish) {
-            setPreviewPlaying(false);
-            sound.setPositionAsync(0);
-          }
-        }
-      );
-      setPreviewSound(sound);
+      if (activePlayer.currentTime >= activePlayer.duration) activePlayer.seekTo(0);
+      activePlayer.play();
       setPreviewPlaying(true);
     }
   };
+
 
   const handleSendPreview = async () => {
     if (!recordingPreviewUri) return;
     const uri = recordingPreviewUri;
     setRecordingPreviewUri(null);
-    if (previewSound) {
-      await previewSound.unloadAsync();
-      setPreviewSound(null);
+    if (previewPlayer) {
+      previewPlayer.pause();
+      previewPlayer.remove();
+      setPreviewPlayer(null);
     }
     const url = await uploadFile(uri, 'audio');
     if (url) handleSend(undefined, url, 'audio');
@@ -623,9 +638,10 @@ export default function ChatScreen() {
     if (!recordingPreviewUri) return;
     const uri = recordingPreviewUri;
     setRecordingPreviewUri(null);
-    if (previewSound) {
-      await previewSound.unloadAsync();
-      setPreviewSound(null);
+    if (previewPlayer) {
+      previewPlayer.pause();
+      previewPlayer.remove();
+      setPreviewPlayer(null);
     }
     await FileSystem.deleteAsync(uri).catch(() => { });
   };
@@ -715,15 +731,23 @@ export default function ChatScreen() {
   const partnerName = partnerProfile.display_name ?? partnerProfile.username ?? 'Your Connection';
   const partnerInitial = partnerName.charAt(0).toUpperCase();
 
-  const renderBubbleItem = ({ item, index }: { item: Message, index: number }) => {
+  const renderBubbleItem = ({ item, index }: { item: any, index: number }) => {
+    if (item.type === 'date_divider') {
+      return (
+        <View style={styles.dateDivider}>
+          <View style={styles.dateDividerLine} />
+          <Text style={styles.dateDividerText}>{item.label}</Text>
+          <View style={styles.dateDividerLine} />
+        </View>
+      );
+    }
+
     const isMe = item.sender_id === session?.user?.id;
     const parentMsg = item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) : null;
     
-    // Clustering detection in inverted FlatList:
-    // next rendered item (visually ABOVE) is index + 1
-    // previous rendered item (visually BELOW) is index - 1
-    const isClusteredTop = index < messages.length - 1 && messages[index+1].sender_id === item.sender_id;
-    const isClusteredBottom = index > 0 && messages[index-1].sender_id === item.sender_id;
+    // Clustering detection for bubbles of the same sender
+    const isClusteredTop = index < displayItems.length - 1 && displayItems[index+1].sender_id === item.sender_id;
+    const isClusteredBottom = index > 0 && displayItems[index-1].sender_id === item.sender_id;
 
     return (
       <ChatBubble
@@ -741,18 +765,60 @@ export default function ChatScreen() {
     );
   };
 
+  // ── Date Grouping Logic ──
+  const formatDateLabel = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    const isYesterday = d.toDateString() === yesterday.toDateString();
+
+    if (isToday) return 'Today';
+    if (isYesterday) return 'Yesterday';
+    
+    // DD/MM/YYYY
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  };
+
+  const displayItems: any[] = [];
+  messages.forEach((m, i) => {
+    displayItems.push(m);
+    const currentDay = new Date(m.created_at).toDateString();
+    const prevDay = i < messages.length - 1 ? new Date(messages[i+1].created_at).toDateString() : null;
+    
+    if (currentDay !== prevDay) {
+      displayItems.push({
+        id: `date-${m.id}`,
+        type: 'date_divider',
+        label: formatDateLabel(m.created_at)
+      });
+    }
+  });
+
   const pinnedMessage = messages.find(m => m.is_pinned);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <KeyboardAvoidingView
-        style={[styles.root, { paddingBottom: insets.bottom }]}
+        style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000000' }]} />
+        <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
+        {activeBondKey === 'classic' && (
+          <ImageBackground 
+            source={chatPattern} 
+            style={StyleSheet.absoluteFill} 
+            tintColor="#000"
+            imageStyle={{ opacity: 0.03 }} 
+          />
+        )}
 
         {/* ── Ref 4 Ultra-Clean Header ── */}
-        <View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom: 12, backgroundColor: '#000000' }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom: 12, backgroundColor: 'transparent' }]}>
           <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
@@ -806,13 +872,13 @@ export default function ChatScreen() {
           </View>
         ) : (
           <FlatList
-            data={messages}
+            data={displayItems}
             keyExtractor={(item) => item.id}
             renderItem={renderBubbleItem}
             inverted={true}
             contentContainerStyle={[styles.listContent, { paddingBottom: 100 }]}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={15}
+            initialNumToRender={20}
             maxToRenderPerBatch={10}
             windowSize={5}
             removeClippedSubviews={Platform.OS === 'android'}
@@ -1112,7 +1178,6 @@ const styles = StyleSheet.create({
   bubbleMeta: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4, paddingHorizontal: 4 },
   bubbleMetaMe: { alignSelf: 'flex-end' },
   bubbleName: { fontSize: 10, fontWeight: '800', color: '#888', textTransform: 'uppercase' },
-  bubbleTime: { fontSize: 9, color: '#BBB' },
 
   bubble: {
     paddingHorizontal: 14,
@@ -1153,7 +1218,18 @@ const styles = StyleSheet.create({
   pinnedText: { fontSize: 13, fontWeight: '600', marginLeft: 8 },
 
   contextBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
-  contextMenu: { position: 'absolute', width: 200, borderRadius: 20, padding: 6, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { height: 8, width: 0 }, shadowOpacity: 0.15, shadowRadius: 16 },
+  contextMenu: { 
+    position: 'absolute', 
+    width: 200, 
+    borderRadius: 20, 
+    padding: 6, 
+    backgroundColor: '#FFF', 
+    ...Platform.select({
+      ...shadow('#000', { height: 8, width: 0 }, 0.15, 16, 6),
+      android: { elevation: 10 },
+      web: { boxShadow: '0 8px 16px rgba(0,0,0,0.15)' }
+    })
+  },
   contextHeader: { fontSize: 10, fontWeight: '800', textAlign: 'center', paddingVertical: 8, opacity: 0.4, textTransform: 'uppercase' },
   contextSnippet: { fontSize: 12, textAlign: 'center', paddingBottom: 10, opacity: 0.6 },
   contextButtonGroup: { borderRadius: 14, overflow: 'hidden' },
@@ -1185,11 +1261,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 6,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    ...Platform.select({
+      ...shadow('#000', { width: 0, height: 4 }, 0.1, 12, 4),
+      android: { elevation: 4 },
+      web: { boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }
+    }),
   },
   discardBtn: { padding: 10 },
   previewCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -1206,11 +1282,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 10,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
+    ...Platform.select({
+      ...shadow('#000', { width: 0, height: 4 }, 0.1, 10, 3),
+      android: { elevation: 4 },
+      web: { boxShadow: '0 4px 10px rgba(0,0,0,0.1)' }
+    }),
   },
   imagePreviewThumb: {
     width: 60,
@@ -1251,11 +1327,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: '#333',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 8,
+    ...Platform.select({
+      ...shadow('#000', { width: 0, height: 8 }, 0.3, 16, 10),
+      android: { elevation: 8 },
+      web: { boxShadow: '0 8px 16px rgba(0,0,0,0.3)' }
+    }),
     zIndex: 9999,
   },
   hoverMicGroup: {
@@ -1316,5 +1392,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  dateDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+    paddingHorizontal: 20,
+  },
+  dateDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  dateDividerText: {
+    paddingHorizontal: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#888',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  bubbleTime: {
+    fontSize: 9,
+    fontWeight: '600',
+    opacity: 0.7,
   },
 });

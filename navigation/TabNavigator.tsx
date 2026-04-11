@@ -4,13 +4,18 @@ import { Text, StyleSheet, View } from 'react-native';
 import HomeScreen from '../screens/HomeScreen';
 import ConnectionsScreen from '../screens/ConnectionsScreen';
 import GiftScreen from '../screens/GiftScreen';
+import MapScreen from '../screens/MapScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import SyncLinkScreen from '../screens/SyncLinkScreen';
 import { useStore } from '../store/useStore';
+import { shadow } from '../lib/theme/shadows';
 
 const Tab = createBottomTabNavigator();
 
 const icons: Record<string, string> = {
   Home: '🌸',
+  SyncLink: '🗓️',
+  Bridge: '📍',
   Connections: '👥',
   Gift: '🎁',
   Profile: '✦',
@@ -45,6 +50,8 @@ export default function TabNavigator() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="SyncLink" component={SyncLinkScreen} options={{ tabBarLabel: 'Sync-Link' }} />
+      <Tab.Screen name="Bridge" component={MapScreen} />
       <Tab.Screen name="Connections" component={ConnectionsScreen} />
       <Tab.Screen name="Gift" component={GiftScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
@@ -60,11 +67,7 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 4,
     height: 68,
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 8,
+    ...shadow('#3D2B1F', { width: 0, height: -4 }, 0.06, 12, 8),
   },
   icon: {
     fontSize: 22,

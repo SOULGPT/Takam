@@ -11,12 +11,12 @@ import {
   StatusBar,
   Platform,
   TextInput,
-  Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
 import { useStore, Bond, BOND_META, BondType } from '../store/useStore';
+import { shadow } from '../lib/theme/shadows';
 
 // ── All 10 relationship types ─────────────────────────────────────────────────
 const ALL_BOND_TYPES: BondType[] = [
@@ -28,12 +28,10 @@ function generateBondCode(): string {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// ── Initials helper ───────────────────────────────────────────────────────────
 function initials(name: string): string {
   return name.split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2);
 }
 
-// ── Bond card ─────────────────────────────────────────────────────────────────
 function BondCard({
   bond,
   myId,
@@ -112,11 +110,6 @@ function BondCard({
                 <Text style={styles.pendingPillText}>Pending</Text>
               </View>
             )}
-            {isRequested && (
-              <View style={[styles.pendingPill, { backgroundColor: '#F0DC8A' }]}>
-                <Text style={[styles.pendingPillText, { color: '#6B5800' }]}>Requested</Text>
-              </View>
-            )}
           </View>
 
           {isPending && isCreator && (
@@ -158,7 +151,6 @@ function BondCard({
             );
           }}
           activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Text style={styles.menuDots}>•••</Text>
         </TouchableOpacity>
@@ -167,7 +159,6 @@ function BondCard({
   );
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <View style={styles.emptyWrap}>
@@ -190,7 +181,6 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-// ── Bond type picker (for create flow) ───────────────────────────────────────
 function TypePicker({
   selected,
   onSelect,
@@ -227,7 +217,6 @@ function TypePicker({
   );
 }
 
-// ── Main ConnectionsScreen ────────────────────────────────────────────────────
 type Mode = 'list' | 'typeSelect' | 'create' | 'join' | 'waiting';
 
 export default function ConnectionsScreen() {
@@ -243,14 +232,12 @@ export default function ConnectionsScreen() {
     removeBond,
   } = useStore();
 
-  // ── Local state for Add Connection flow ──────────────────────────────────
   const [mode, setMode] = useState<Mode>('list');
   const [selectedType, setSelectedType] = useState<BondType>('partner');
   const [joinCode, setJoinCode] = useState('');
   const [pendingBond, setPendingBond] = useState<Bond | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // ── Create bond ───────────────────────────────────────────────────────────
   const handleCreate = async () => {
     if (!session?.user) return;
     setLoading(true);
@@ -279,7 +266,6 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // ── Join bond ─────────────────────────────────────────────────────────────
   const handleJoin = async () => {
     if (!session?.user || joinCode.length !== 6) return;
     setLoading(true);
@@ -306,7 +292,6 @@ export default function ConnectionsScreen() {
       if (!updated) throw new Error('Could not join bond. Please try again.');
 
       addBond(updated as Bond);
-      // Fetch partner profile
       const { data: partnerProfile } = await supabase
         .from('profiles')
         .select('*')
@@ -326,7 +311,6 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // ── Accept bond ───────────────────────────────────────────────────────────
   const handleAccept = async (bond: Bond) => {
     try {
       const { data, error } = await supabase
@@ -346,10 +330,8 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // ── Reject bond ───────────────────────────────────────────────────────────
   const handleReject = async (bond: Bond) => {
     try {
-      // Deleting the bond entirely if rejected
       const { error } = await supabase.from('bonds').delete().eq('id', bond.id);
       if (error) throw error;
       removeBond(bond.id);
@@ -358,7 +340,6 @@ export default function ConnectionsScreen() {
     }
   };
 
-  // ── Remove bond ───────────────────────────────────────────────────────────
   const handleRemove = (bond: Bond) => {
     const meta = BOND_META[bond.bond_type] ?? BOND_META.other;
     const partner = bondMembers[bond.id];
@@ -380,13 +361,11 @@ export default function ConnectionsScreen() {
     );
   };
 
-  // ── Set active + navigate home ────────────────────────────────────────────
   const handleSetActive = (bondId: string) => {
     setActiveBondId(bondId);
     nav.navigate?.('Home');
   };
 
-  // ── Copy code helper for waiting screen ──────────────────────────────────
   const copyCode = (code: string) => {
     if (Platform.OS === 'web') {
       navigator.clipboard?.writeText(code)
@@ -401,7 +380,6 @@ export default function ConnectionsScreen() {
   const activeBonds = bonds.filter((b) => b.status === 'active');
   const pendingBonds = bonds.filter((b) => b.status === 'pending');
 
-  // ── RENDER: List ─────────────────────────────────────────────────────────
   if (mode === 'list') {
     return (
       <View style={styles.root}>
@@ -409,12 +387,9 @@ export default function ConnectionsScreen() {
         <LinearGradient
           colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']}
           style={StyleSheet.absoluteFill}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
         />
         <View style={[styles.blobDeco, styles.blobTR]} />
 
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerTextWrap}>
             <Text style={styles.headerTitle}>Connections</Text>
@@ -438,7 +413,6 @@ export default function ConnectionsScreen() {
             data={bonds}
             keyExtractor={(b) => b.id}
             contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
             renderItem={({ item }) => (
               <BondCard
                 bond={item}
@@ -454,7 +428,6 @@ export default function ConnectionsScreen() {
           />
         )}
 
-        {/* FAB */}
         {bonds.length > 0 && (
           <TouchableOpacity
             style={styles.fab}
@@ -464,8 +437,6 @@ export default function ConnectionsScreen() {
             <LinearGradient
               colors={['#D97B60', '#C9705A']}
               style={styles.fabGrad}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
             >
               <Text style={styles.fabText}>+ Add</Text>
             </LinearGradient>
@@ -475,7 +446,6 @@ export default function ConnectionsScreen() {
     );
   }
 
-  // ── RENDER: Choose create or join ────────────────────────────────────────
   if (mode === 'typeSelect') {
     const meta = BOND_META[selectedType];
     return (
@@ -483,7 +453,7 @@ export default function ConnectionsScreen() {
         <StatusBar barStyle="dark-content" />
         <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
 
-        <ScrollView contentContainerStyle={styles.flowContent} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.flowContent}>
           <TouchableOpacity onPress={() => setMode('list')} style={styles.backRow}>
             <Text style={styles.backText}>← Back</Text>
           </TouchableOpacity>
@@ -497,13 +467,10 @@ export default function ConnectionsScreen() {
             <TouchableOpacity
               style={styles.createBtn}
               onPress={() => setMode('create')}
-              activeOpacity={0.87}
             >
               <LinearGradient
                 colors={[meta.color + 'CC', meta.color]}
                 style={styles.createBtnGrad}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
               >
                 <Text style={styles.createBtnText}>{meta.emoji}  Generate Bond Code</Text>
               </LinearGradient>
@@ -512,7 +479,6 @@ export default function ConnectionsScreen() {
             <TouchableOpacity
               style={styles.joinBtn}
               onPress={() => setMode('join')}
-              activeOpacity={0.87}
             >
               <Text style={styles.joinBtnText}>🔗  I have a code to enter</Text>
             </TouchableOpacity>
@@ -522,7 +488,6 @@ export default function ConnectionsScreen() {
     );
   }
 
-  // ── RENDER: Create (confirm + generate) ──────────────────────────────────
   if (mode === 'create') {
     const meta = BOND_META[selectedType];
     return (
@@ -541,13 +506,10 @@ export default function ConnectionsScreen() {
               style={styles.generateBtn}
               onPress={handleCreate}
               disabled={loading}
-              activeOpacity={0.85}
             >
               <LinearGradient
                 colors={['#D97B60', '#C9705A', '#A8503E']}
                 style={styles.generateBtnGrad}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
               >
                 {loading ? (
                   <ActivityIndicator color="#FDFAF4" />
@@ -562,7 +524,6 @@ export default function ConnectionsScreen() {
     );
   }
 
-  // ── RENDER: Waiting for partner ──────────────────────────────────────────
   if (mode === 'waiting' && pendingBond) {
     const meta = BOND_META[pendingBond.bond_type] ?? BOND_META.other;
     return (
@@ -581,7 +542,6 @@ export default function ConnectionsScreen() {
             <TouchableOpacity
               style={styles.copyBtn}
               onPress={() => copyCode(pendingBond.bond_code)}
-              activeOpacity={0.8}
             >
               <Text style={styles.copyBtnText}>📋  Copy Code</Text>
             </TouchableOpacity>
@@ -598,7 +558,6 @@ export default function ConnectionsScreen() {
     );
   }
 
-  // ── RENDER: Join ─────────────────────────────────────────────────────────
   return (
     <View style={styles.root}>
       <LinearGradient colors={['#FDFAF4', '#F5ECD7', '#EDD9B8']} style={StyleSheet.absoluteFill} />
@@ -623,13 +582,10 @@ export default function ConnectionsScreen() {
             style={[styles.generateBtn, joinCode.length !== 6 && styles.generateBtnDisabled]}
             onPress={handleJoin}
             disabled={loading || joinCode.length !== 6}
-            activeOpacity={0.85}
           >
             <LinearGradient
               colors={joinCode.length === 6 ? ['#D97B60', '#C9705A', '#A8503E'] : ['#D9BC8A', '#C5A870']}
               style={styles.generateBtnGrad}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
             >
               {loading ? (
                 <ActivityIndicator color="#FDFAF4" />
@@ -644,34 +600,18 @@ export default function ConnectionsScreen() {
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F5ECD7' },
-
   blobDeco: { position: 'absolute', borderRadius: 999, opacity: 0.1, backgroundColor: '#C9705A' },
   blobTR: { width: 220, height: 220, top: -60, right: -60 },
 
-  // ── Header ──
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    gap: 4,
-  },
+  header: { paddingTop: 60, paddingHorizontal: 24, paddingBottom: 16, gap: 4 },
   headerTextWrap: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerTitle: { fontSize: 30, fontWeight: '800', color: '#3D2B1F', letterSpacing: 0.3 },
   headerSub: { fontSize: 14, color: '#8C6246' },
-  countBadge: {
-    backgroundColor: '#C9705A',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    minWidth: 24,
-    alignItems: 'center',
-  },
+  countBadge: { backgroundColor: '#C9705A', borderRadius: 12, paddingHorizontal: 8, paddingVertical: 2, minWidth: 24, alignItems: 'center' },
   countBadgeText: { fontSize: 13, fontWeight: '800', color: '#FDFAF4' },
 
-  // ── Bond cards ──
   listContent: { paddingHorizontal: 16, paddingBottom: 100 },
   bondCard: {
     backgroundColor: '#FDFAF4',
@@ -679,252 +619,77 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
     overflow: 'hidden',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    ...shadow('#3D2B1F', { width: 0, height: 3 }, 0.07, 10, 4),
   },
-  bondCardActive: {
-    borderColor: '#C9705A',
-    shadowOpacity: 0.13,
-    elevation: 5,
-  },
-  activeStripe: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 4,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    paddingLeft: 20,
-    gap: 14,
-  },
-  avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    justifyContent: 'center',
-    alignItems: 'center',
-    flexShrink: 0,
-  },
+  bondCardActive: { borderColor: '#C9705A' },
+  activeStripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
+  cardRow: { flexDirection: 'row', alignItems: 'center', padding: 16, paddingLeft: 20, gap: 14 },
+  avatar: { width: 52, height: 52, borderRadius: 26, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
   avatarText: { fontSize: 18, fontWeight: '800', color: '#FDFAF4' },
   cardInfo: { flex: 1, gap: 4 },
   cardNameRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   cardName: { fontSize: 16, fontWeight: '700', color: '#3D2B1F', flex: 1 },
-  activeBadge: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
+  activeBadge: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 },
   activeBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
   typeBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   typeEmoji: { fontSize: 13 },
   typeLabel: { fontSize: 12, color: '#8C6246', fontWeight: '500' },
-  pendingPill: {
-    backgroundColor: '#F0DC8A',
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    marginLeft: 4,
-  },
+  pendingPill: { backgroundColor: '#F0DC8A', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 4 },
   pendingPillText: { fontSize: 10, fontWeight: '700', color: '#6B5800' },
-  codeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 4,
-    backgroundColor: '#F5ECD7',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignSelf: 'flex-start',
-  },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, backgroundColor: '#F5ECD7', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignSelf: 'flex-start' },
   codeText: { fontSize: 16, fontWeight: '900', color: '#3D2B1F', letterSpacing: 4 },
   copyLabel: { fontSize: 12, color: '#8C6246', fontWeight: '600' },
   menuBtn: { paddingLeft: 6 },
   menuDots: { fontSize: 16, color: '#B5947A', fontWeight: '700', letterSpacing: -1 },
-
-  // Action Buttons
   actionButtonsRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
   btnAccept: { backgroundColor: '#C9705A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   btnAcceptText: { color: '#FDFAF4', fontSize: 13, fontWeight: '700' },
   btnReject: { backgroundColor: 'transparent', borderWidth: 1, borderColor: '#D9BC8A', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
   btnRejectText: { color: '#8C6246', fontSize: 13, fontWeight: '700' },
 
-  // ── Empty state ──
-  emptyWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    gap: 14,
-    marginTop: -40,
-  },
+  emptyWrap: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 32, gap: 14, marginTop: -40 },
   emptyEmoji: { fontSize: 64 },
   emptyTitle: { fontSize: 22, fontWeight: '800', color: '#3D2B1F', textAlign: 'center' },
   emptySub: { fontSize: 14, color: '#8C6246', textAlign: 'center', lineHeight: 21 },
-  emptyBtn: {
-    borderRadius: 18,
-    overflow: 'hidden',
-    marginTop: 8,
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.28,
-    shadowRadius: 12,
-    elevation: 7,
-  },
+  emptyBtn: { borderRadius: 18, overflow: 'hidden', marginTop: 8, ...shadow('#9B3D2C', { width: 0, height: 5 }, 0.28, 12, 8) },
   emptyBtnGrad: { paddingVertical: 16, paddingHorizontal: 28, alignItems: 'center' },
   emptyBtnText: { fontSize: 15, fontWeight: '800', color: '#FDFAF4' },
 
-  // ── FAB ──
-  fab: {
-    position: 'absolute',
-    bottom: 28,
-    right: 20,
-    borderRadius: 28,
-    overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 9,
-  },
+  fab: { position: 'absolute', bottom: 28, right: 20, borderRadius: 28, overflow: 'hidden', ...shadow('#9B3D2C', { width: 0, height: 6 }, 0.3, 12, 10) },
   fabGrad: { paddingVertical: 14, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center' },
   fabText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.2 },
 
-  // ── Flow screens ──
-  flowContent: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 64,
-    gap: 18,
-  },
+  flowContent: { flex: 1, paddingHorizontal: 24, paddingTop: 64, gap: 18 },
   backRow: { marginBottom: 4 },
   backText: { fontSize: 15, color: '#8C6246', fontWeight: '600' },
   flowTitle: { fontSize: 28, fontWeight: '800', color: '#3D2B1F', letterSpacing: 0.2 },
   flowSub: { fontSize: 14, color: '#8C6246', lineHeight: 21, marginBottom: 4 },
-
-  // ── Type grid ──
-  typeGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  typeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    backgroundColor: '#FDFAF4',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    width: '47%',
-  },
+  typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingVertical: 4 },
+  typeChip: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#FDFAF4', borderRadius: 14, borderWidth: 1.5, borderColor: '#D9BC8A', paddingVertical: 11, paddingHorizontal: 14, width: '47%' },
   typeChipEmoji: { fontSize: 18 },
   typeChipLabel: { fontSize: 13, fontWeight: '500', color: '#5C3D2E', flex: 1 },
   typeChipDot: { width: 8, height: 8, borderRadius: 4 },
-
-  // ── Action choice ──
   actionChoice: { gap: 12, marginTop: 4 },
-  createBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
-  },
+  createBtn: { borderRadius: 16, overflow: 'hidden', ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.25, 10, 6) },
   createBtnGrad: { paddingVertical: 17, alignItems: 'center' },
   createBtnText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.3 },
-  joinBtn: {
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#C9705A',
-    paddingVertical: 17,
-    alignItems: 'center',
-    backgroundColor: 'transparent',
-  },
+  joinBtn: { borderRadius: 16, borderWidth: 1.5, borderColor: '#C9705A', paddingVertical: 17, alignItems: 'center', backgroundColor: 'transparent' },
   joinBtnText: { fontSize: 15, fontWeight: '600', color: '#C9705A' },
 
-  // ── Create / waiting cards ──
-  createCard: {
-    backgroundColor: '#FDFAF4',
-    borderRadius: 22,
-    padding: 24,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-  },
-  generateBtn: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  generateBtnDisabled: { shadowOpacity: 0.08, elevation: 1 },
+  createCard: { backgroundColor: '#FDFAF4', borderRadius: 22, padding: 24, borderWidth: 1.5, borderColor: '#D9BC8A' },
+  generateBtn: { backgroundColor: '#C9705A', borderRadius: 14, ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.25, 8, 4) },
+  generateBtnDisabled: { ...shadow('#3D2B1F', { width: 0, height: 2 }, 0.08, 4, 1) },
   generateBtnGrad: { paddingVertical: 17, alignItems: 'center' },
   generateBtnText: { fontSize: 16, fontWeight: '800', color: '#FDFAF4', letterSpacing: 0.3 },
 
-  waitCard: {
-    backgroundColor: '#FDFAF4',
-    borderRadius: 24,
-    padding: 32,
-    alignItems: 'center',
-    gap: 14,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
+  waitCard: { backgroundColor: '#FDFAF4', borderRadius: 24, padding: 24, gap: 18, borderWidth: 1.5, borderColor: '#D9BC8A', ...shadow('#3D2B1F', { width: 0, height: 4 }, 0.08, 12, 6) },
   waitType: { fontSize: 14, fontWeight: '700', color: '#8C6246' },
   waitCodeLabel: { fontSize: 11, color: '#B5947A', letterSpacing: 2, fontWeight: '700' },
-  waitCode: { fontSize: 42, fontWeight: '900', color: '#3D2B1F', letterSpacing: 10 },
-  copyBtn: {
-    backgroundColor: '#F5ECD7',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-  },
+  waitCode: { fontSize: 42, fontWeight: '900', color: '#3D2B1F', letterSpacing: 10, textAlign: 'center' },
+  copyBtn: { backgroundColor: '#F5ECD7', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24, borderWidth: 1.5, borderColor: '#D9BC8A', alignItems: 'center' },
   copyBtnText: { fontSize: 14, fontWeight: '600', color: '#8C6246' },
-  waitNote: { fontSize: 13, color: '#B5947A', fontStyle: 'italic' },
+  waitNote: { fontSize: 13, color: '#B5947A', fontStyle: 'italic', textAlign: 'center' },
 
-  // ── Join card ──
-  joinCard: {
-    backgroundColor: '#FDFAF4',
-    borderRadius: 24,
-    padding: 24,
-    gap: 18,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-  },
-  codeInput: {
-    backgroundColor: '#F5ECD7',
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#D9BC8A',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#3D2B1F',
-    textAlign: 'center',
-    letterSpacing: 8,
-  },
+  joinCard: { backgroundColor: '#FDFAF4', borderRadius: 24, padding: 24, gap: 18, borderWidth: 1.5, borderColor: '#D9BC8A' },
+  codeInput: { backgroundColor: '#F5ECD7', borderRadius: 14, borderWidth: 1.5, borderColor: '#D9BC8A', paddingVertical: 16, paddingHorizontal: 20, fontSize: 28, fontWeight: '800', color: '#3D2B1F', textAlign: 'center', letterSpacing: 8 },
 });

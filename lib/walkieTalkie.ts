@@ -1,40 +1,33 @@
-import { Audio, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+import { createAudioPlayer, useAudioRecorder, AudioModule, RecordingPresets } from 'expo-audio';
+import { Platform } from 'react-native';
 import { supabase } from './supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 
-let recordingInstance: Audio.Recording | null = null;
+let recordingInstance: any = null;
 
 export const requestMicrophonePermission = async () => {
-  const { status } = await Audio.requestPermissionsAsync();
+  const { status } = await AudioModule.requestRecordingPermissionsAsync();
   return status === 'granted';
 };
 
 export const startRecording = async () => {
   try {
-    // 1. Safety Cleanup: Ensure any previous object is completely destroyed
     if (recordingInstance) {
-      try {
-        await recordingInstance.stopAndUnloadAsync().catch(() => {});
-      } catch (e) {
-        // Already unloaded or other non-critical error
-      }
-      recordingInstance = null;
+       try { await recordingInstance.stop(); } catch (e) { console.debug('Recorder already stopped'); }
+       recordingInstance = null;
     }
 
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-      playThroughEarpieceAndroid: false,
+    // New AudioModule config
+    await AudioModule.setAudioModeAsync({
+      allowsRecording: true,
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'duckOthers',
     });
 
-    const { recording: newRecording } = await Audio.Recording.createAsync(
-      Audio.RecordingOptionsPresets.LOW_QUALITY
-    );
-    recordingInstance = newRecording;
+    recordingInstance = new AudioModule.AudioRecorder(RecordingPresets.LOW_QUALITY);
+    await recordingInstance.prepareToRecordAsync();
+    recordingInstance.record();
     return true;
   } catch (err) {
     console.error('Failed to start recording', err);
@@ -47,8 +40,8 @@ export const stopRecording = async () => {
   if (!recordingInstance) return null;
 
   try {
-    await recordingInstance.stopAndUnloadAsync();
-    const uri = recordingInstance.getURI();
+    await recordingInstance.stop();
+    const uri = recordingInstance.uri;
     recordingInstance = null;
     return uri;
   } catch (err) {
@@ -63,16 +56,20 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
   if (!uri) return null;
 
   try {
-    // Slight delay to ensure filesystem is ready
-    await new Promise(r => setTimeout(r, 100));
-
-    // Universal upload pattern: works on Web and Native
-    const response = await fetch(uri);
-    const blob = await response.blob();
-
     const actualExt = uri.split('.').pop() || 'm4a';
     const fileName = `burst_${bondId}_${Date.now()}.${actualExt}`;
     const filePath = `${bondId}/${fileName}`;
+
+    let blob: Blob;
+    if (Platform.OS === 'web') {
+      const response = await fetch(uri);
+      blob = await response.blob();
+    } else {
+      // Use FileSystem for potentially faster access on Native
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+      const buffer = decode(base64);
+      blob = new Blob([buffer], { type: actualExt === 'webm' ? 'audio/webm' : 'audio/m4a' });
+    }
 
     const { data, error } = await supabase.storage
       .from('walkie-bursts')
@@ -96,29 +93,26 @@ export const stopRecordingAndUpload = async (bondId: string, userId: string) => 
 
 export const playBurst = async (url: string, onFinish?: () => void) => {
   try {
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: true,
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.DuckOthers,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DuckOthers,
-      playThroughEarpieceAndroid: false,
+    await AudioModule.setAudioModeAsync({
+      allowsRecording: false, // Don't block background audio when just playing if possibly
+      playsInSilentMode: true,
+      shouldPlayInBackground: true,
+      interruptionMode: 'duckOthers',
     });
 
-    const { sound } = await Audio.Sound.createAsync(
-      { uri: url },
-      { shouldPlay: true, volume: 1.0 }
-    );
-
-    sound.setOnPlaybackStatusUpdate((status) => {
-      if (status.isLoaded && status.didJustFinish) {
-        sound.unloadAsync();
-        if (onFinish) onFinish();
+    const player = createAudioPlayer(url);
+    
+    // In SDK 54, we must manually .remove() players created via createAudioPlayer
+    const subscription = player.addListener('playbackStatusUpdate', (status: any) => {
+      if (status.didJustFinish) {
+        onFinish?.();
+        player.remove();
+        subscription.remove();
       }
     });
 
-    return sound;
+    player.play();
+    return player;
   } catch (err) {
     console.error('Failed to play burst', err);
     throw err;

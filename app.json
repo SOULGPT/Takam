@@ -17,7 +17,14 @@
       "bundleIdentifier": "com.takam.app",
       "usesAppleSignIn": true,
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Used for gift delivery address."
+        "NSLocationWhenInUseUsageDescription": "Used for gift delivery address.",
+        "NFCReaderUsageDescription": "Tap-to-Bond uses NFC to securely connect you with your partner."
+      },
+      "entitlements": {
+        "com.apple.developer.nfc.readersession.formats": [
+          "NDEF",
+          "TAG"
+        ]
       }
     },
     "android": {
@@ -25,7 +32,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F5ECD7"
       },
-      "package": "com.takam.app"
+      "package": "com.takam.app",
+      "intentFilters": [
+        {
+          "action": "android.nfc.action.NDEF_DISCOVERED",
+          "data": [
+            {
+              "protocol": "https",
+              "host": "takam.app"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -38,7 +56,15 @@
         {
           "iosUrlScheme": "com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"
         }
-      ]
+      ],
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Allow TAKAM to interact with nearby NFC devices.",
+          "includeNdefEntitlement": true
+        }
+      ],
+      "expo-audio"
     ],
     "extra": {
       "eas": {

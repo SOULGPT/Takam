@@ -147,6 +147,9 @@ export interface Profile {
   premium_expires_at?: string;
   is_online?: boolean;
   last_active_at?: string;
+  last_latitude?: number;
+  last_longitude?: number;
+  timezone?: string;
 }
 
 interface AppState {

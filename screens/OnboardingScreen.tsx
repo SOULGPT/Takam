@@ -14,6 +14,7 @@ import {
   Animated,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { shadow } from '../lib/theme/shadows';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 
@@ -167,12 +168,12 @@ export default function OnboardingScreen({ onComplete }: Props) {
       Animated.timing(slideAnim, {
         toValue: -30,
         duration: 180,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 0,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }),
     ]).start(() => {
       setStep(nextStep);
@@ -180,7 +181,7 @@ export default function OnboardingScreen({ onComplete }: Props) {
         toValue: 0,
         tension: 70,
         friction: 9,
-        useNativeDriver: true,
+        useNativeDriver: Platform.OS !== 'web',
       }).start();
     });
   };
@@ -504,11 +505,7 @@ const cpStyles = StyleSheet.create({
     borderColor: '#D9BC8A',
     marginTop: 4,
     overflow: 'hidden',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 6,
+    ...shadow('#3D2B1F', { width: 0, height: 4 }, 0.1, 10, 3),
   },
   search: {
     borderBottomWidth: 1,
@@ -573,11 +570,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.2, 8, 4),
   },
   miniLogoInner: {
     width: 22,
@@ -626,11 +619,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     fontSize: 15,
     color: '#3D2B1F',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...shadow('#3D2B1F', { width: 0, height: 1 }, 0.05, 4, 1),
   },
   textArea: {
     height: 90,
@@ -713,11 +702,7 @@ const styles = StyleSheet.create({
     flex: 1,
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 7,
+    ...shadow('#9B3D2C', { width: 0, height: 5 }, 0.3, 12, 6),
   },
   nextBtnDisabled: {
     shadowOpacity: 0.1,

@@ -10,9 +10,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { isAppleSignInAvailable } from '../lib/auth/apple';
+import { shadow } from '../lib/theme/shadows';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,30 +42,30 @@ function Heart({ delay, x, size }: { delay: number; x: number; size: number }) {
           Animated.timing(opacity, {
             toValue: 0.6,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.timing(scale, {
             toValue: 1,
             duration: 800,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
         ]),
         Animated.parallel([
           Animated.timing(translateY, {
             toValue: -(height * 0.55),
             duration: 3800,
-            useNativeDriver: true,
+            useNativeDriver: Platform.OS !== 'web',
           }),
           Animated.sequence([
             Animated.timing(opacity, {
               toValue: 0.55,
               duration: 2000,
-              useNativeDriver: true,
+              useNativeDriver: Platform.OS !== 'web',
             }),
             Animated.timing(opacity, {
               toValue: 0,
               duration: 1800,
-              useNativeDriver: true,
+              useNativeDriver: Platform.OS !== 'web',
             }),
           ]),
         ]),
@@ -456,11 +458,7 @@ const styles = StyleSheet.create({
     height: 96,
     borderRadius: 48,
     overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 14,
+    ...shadow('#9B3D2C', { width: 0, height: 10 }, 0.3, 20, 14),
   },
   logoGrad: {
     flex: 1,
@@ -515,11 +513,7 @@ const styles = StyleSheet.create({
     gap: 6,
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadow('#3D2B1F', { width: 0, height: 3 }, 0.07, 8, 3),
   },
   featureIcon: { fontSize: 26, marginBottom: 2 },
   featureTitle: {
@@ -544,11 +538,7 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 10,
     marginBottom: 32,
-    shadowColor: '#1A0F09',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.22,
-    shadowRadius: 16,
-    elevation: 8,
+    ...shadow('#1A0F09', { width: 0, height: 6 }, 0.22, 16, 8),
   },
   quoteText: {
     fontSize: 16,
@@ -575,11 +565,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 18,
     overflow: 'hidden',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 10,
+    ...shadow('#9B3D2C', { width: 0, height: 6 }, 0.35, 14, 10),
   },
   primaryCtaGrad: {
     paddingVertical: 18,
@@ -645,11 +631,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
     gap: 10,
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
+    ...shadow('#3D2B1F', { width: 0, height: 2 }, 0.05, 5, 2),
   },
   socialIconBox: {
     width: 32,

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
+import { shadow } from '../lib/theme/shadows';
 import { signInWithGoogle } from '../lib/auth/google';
 import { signInWithApple, isAppleSignInAvailable } from '../lib/auth/apple';
 import { AVATARS, MALE_AVATAR_KEYS, FEMALE_AVATAR_KEYS } from '../utils/avatars';
@@ -634,11 +635,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25,
-    shadowRadius: 16,
-    elevation: 10,
+    ...shadow('#9B3D2C', { width: 0, height: 8 }, 0.25, 16, 10),
   },
   logoInner: {
     width: 44,
@@ -674,11 +671,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderWidth: 1.5,
     borderColor: '#D9BC8A',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...shadow('#3D2B1F', { width: 0, height: 2 }, 0.08, 8, 3),
   },
   googleIcon: { fontSize: 20, fontWeight: '700', color: '#C9705A' },
   googleButtonText: { fontSize: 16, fontWeight: '600', color: '#3D2B1F', letterSpacing: 0.2 },
@@ -691,11 +684,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A0F09',
     borderRadius: 16,
     paddingVertical: 16,
-    shadowColor: '#1A0F09',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
+    ...shadow('#1A0F09', { width: 0, height: 4 }, 0.3, 12, 6),
   },
   appleIcon: { fontSize: 20, color: '#F5ECD7' },
   appleButtonText: { fontSize: 16, fontWeight: '600', color: '#F5ECD7', letterSpacing: 0.2 },
@@ -743,11 +732,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
+    ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.2, 8, 6),
   },
   logoInnerSmall: {
     width: 28,
@@ -771,24 +756,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     fontSize: 15,
     color: '#3D2B1F',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...shadow('#3D2B1F', { width: 0, height: 1 }, 0.05, 4, 1),
   },
 
   submitButton: {
     borderRadius: 16,
     overflow: 'hidden',
     marginTop: 4,
-    shadowColor: '#9B3D2C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.3, 10, 6),
   },
-  submitButtonDisabled: { shadowOpacity: 0.1, elevation: 2 },
+  submitButtonDisabled: { ...shadow('#9B3D2C', { width: 0, height: 4 }, 0.1, 8, 2) },
   submitGrad: { paddingVertical: 17, alignItems: 'center' },
   submitButtonText: { fontSize: 16, fontWeight: '700', color: '#F5ECD7', letterSpacing: 0.4 },
 
@@ -832,11 +809,7 @@ const styles = StyleSheet.create({
     borderColor: '#D9BC8A',
     alignItems: 'center',
     backgroundColor: '#FDFAF4',
-    shadowColor: '#3D2B1F',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    ...shadow('#3D2B1F', { width: 0, height: 1 }, 0.05, 4, 1),
   },
   segmentBtnActive: {
     borderColor: '#C9705A',
