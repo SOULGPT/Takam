@@ -26,6 +26,8 @@ import { shadow } from '../lib/theme/shadows';
 
 // New Velvet Pulse Components
 import BlobAvatar from '../components/BlobAvatar';
+import VibeCard from '../components/VibeCard';
+import WalkieTalkieView from '../components/WalkieTalkieView';
 import * as FileSystem from 'expo-file-system';
 import { useAudioRecorder, requestRecordingPermissionsAsync, AudioModule, RecordingPresets } from 'expo-audio';
 import { playBurst, decode } from '../lib/walkieTalkie';
