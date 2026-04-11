@@ -163,6 +163,7 @@ interface AppState {
 
   // ── Unread State ────────────────────────────────────────────────────────
   unreadCounts: Record<string, number>; // bond_id -> unread_count
+  userBondThemes: Record<string, string>; // bond_id -> theme_key
 
   // ── Actions ───────────────────────────────────────────────────────────────
   setSession: (session: Session | null) => void;
@@ -179,6 +180,7 @@ interface AppState {
   setUnreadCounts: (counts: Record<string, number>) => void;
   incrementUnread: (bondId: string, amount?: number) => void;
   clearUnread: (bondId: string) => void;
+  setUserBondTheme: (bondId: string, theme: string) => void;
 
   reset: () => void;
 }
@@ -190,6 +192,7 @@ export const useStore = create<AppState>((set) => ({
   bondMembers: {},
   activeBondId: null,
   unreadCounts: {},
+  userBondThemes: {},
 
   setSession: (session) => set({ session }),
   setProfile: (profile) => set({ profile }),
@@ -242,5 +245,13 @@ export const useStore = create<AppState>((set) => ({
       },
     })),
 
-  reset: () => set({ session: null, profile: null, bonds: [], bondMembers: {}, activeBondId: null, unreadCounts: {} }),
+  setUserBondTheme: (bondId, theme) =>
+    set((state) => ({
+      userBondThemes: {
+        ...state.userBondThemes,
+        [bondId]: theme,
+      },
+    })),
+
+  reset: () => set({ session: null, profile: null, bonds: [], bondMembers: {}, activeBondId: null, unreadCounts: {}, userBondThemes: {} }),
 }));

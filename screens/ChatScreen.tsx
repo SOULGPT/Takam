@@ -272,7 +272,7 @@ export default function ChatScreen() {
   const recorderState = useAudioRecorderState(recorder, 500);
   const insets = useSafeAreaInsets();
   const nav = useNavigation<any>();
-  const { session, profile, activeBondId, bonds, bondMembers, updateBond } = useStore();
+  const { session, profile, activeBondId, bonds, bondMembers, updateBond, userBondThemes, setUserBondTheme } = useStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
@@ -312,7 +312,8 @@ export default function ChatScreen() {
   // Theme State
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const activeBond = bonds.find((b) => b.id === activeBondId);
-  const activeBondKey = activeBond?.theme || 'classic';
+  // Priority: User's local theme -> Bond's default theme -> classic
+  const activeBondKey = (activeBondId && userBondThemes[activeBondId]) || activeBond?.theme || 'classic';
   const th = CHAT_THEMES[activeBondKey as ChatThemeOption] || CHAT_THEMES.classic;
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -322,25 +323,17 @@ export default function ChatScreen() {
     setThemePickerVisible(false);
     if (!activeBondId || !session?.user || !activeBond) return;
 
-    updateBond({ ...activeBond, theme: newTheme });
+    // 1. Update local store (immediate UI update)
+    setUserBondTheme(activeBondId, newTheme);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await supabase.from('bonds').update({ theme: newTheme }).eq('id', activeBondId);
 
-    const sysMsg: Message = {
-      id: `sys-${Date.now()}`,
-      sender_id: session.user.id,
-      content: `[TAKAM SYSTEM] @${profile?.username || 'User'} changed the theme to ${CHAT_THEMES[newTheme].name} ✨`,
-      created_at: new Date().toISOString(),
-      is_system: true,
-    };
-    setMessages(prev => [sysMsg, ...prev]);
-
-    await supabase.from('messages').insert({
+    // 2. Persist to Supabase (Private preference)
+    await supabase.from('user_chat_preferences').upsert({
+      user_id: session.user.id,
       bond_id: activeBondId,
-      sender_id: session.user.id,
-      content: sysMsg.content,
-      is_system: true
-    });
+      theme_key: newTheme,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'user_id,bond_id' });
   };
 
   const partnerProfile = activeBondId ? bondMembers[activeBondId] : null;

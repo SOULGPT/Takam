@@ -149,8 +149,9 @@ function AppCore() {
             .map((b) => fetchMember(b, session.user.id)),
         );
 
-        // 4. Fetch initial Unread Counts
+        // 4. Fetch initial Unread Counts & Local Themes
         try {
+          // Unread
           const { data: unreadData } = await supabase.rpc('get_unread_counts');
           if (unreadData) {
             const countsMap: Record<string, number> = {};
@@ -159,8 +160,20 @@ function AppCore() {
             });
             useStore.getState().setUnreadCounts(countsMap);
           }
+
+          // Local Themes
+          const { data: themeData } = await supabase
+            .from('user_chat_preferences')
+            .select('bond_id, theme_key')
+            .eq('user_id', session.user.id);
+          
+          if (themeData) {
+            themeData.forEach(row => {
+              useStore.getState().setUserBondTheme(row.bond_id, row.theme_key);
+            });
+          }
         } catch (e) {
-          console.warn('Failed to fetch unread counts', e);
+          console.warn('Failed to fetch initial state', e);
         }
 
         // 5. Default active bond → first active one
