@@ -224,9 +224,17 @@ function AppCore() {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           if (payload.new.sender_id !== session.user.id) {
-            // Only increment if we are not currently actively looking at THIS bond's ChatScreen
-            // (We'll assume strict clearing happens in ChatScreen onFocus)
             useStore.getState().incrementUnread(payload.new.bond_id, 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'messages' },
+        (payload) => {
+          // If message was unread and now is read (by current user elsewhere), clear the badge
+          if (payload.old.read_at === null && payload.new.read_at !== null && payload.new.sender_id !== session.user.id) {
+            useStore.getState().clearUnread(payload.new.bond_id);
           }
         }
       )
@@ -236,6 +244,15 @@ function AppCore() {
         (payload) => {
           if (payload.new.sender_id !== session.user.id) {
             useStore.getState().incrementUnread(payload.new.bond_id, 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'vibes' },
+        (payload) => {
+          if (payload.old.read_at === null && payload.new.read_at !== null && payload.new.sender_id !== session.user.id) {
+            useStore.getState().clearUnread(payload.new.bond_id);
           }
         }
       )

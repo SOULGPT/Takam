@@ -51,13 +51,13 @@ export function findGreenZones(userAEvents: any[], userBEvents: any[], dayStart:
       EXCLUDED_CATEGORIES.includes(e.category) && 
       dayjs(e.start_time).isBefore(slotEnd) && 
       dayjs(e.end_time).isAfter(slotStart)
-    );
+    ) && (userAEvents.length > 0 || (slotStart.hour() >= 7 && slotStart.hour() < 23 && !(slotStart.hour() >= 9 && slotStart.hour() < 17)));
 
     const isBFree = !userBEvents.some(e => 
       EXCLUDED_CATEGORIES.includes(e.category) && 
       dayjs(e.start_time).isBefore(slotEnd) && 
       dayjs(e.end_time).isAfter(slotStart)
-    );
+    ) && (userBEvents.length > 0 || (slotStart.hour() >= 7 && slotStart.hour() < 23 && !(slotStart.hour() >= 9 && slotStart.hour() < 17)));
 
     if (isAFree && isBFree) {
       if (!currentStart) currentStart = slotStart;

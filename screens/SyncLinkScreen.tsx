@@ -7,7 +7,8 @@ import {
   TouchableOpacity, 
   ActivityIndicator,
   Modal,
-  Platform
+  Platform,
+  KeyboardAvoidingView
 } from 'react-native';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
@@ -19,12 +20,19 @@ import SyncLine from '../components/calendar/SyncLine';
 import TimelineRibbon from '../components/calendar/TimelineRibbon';
 import EventDrawer from '../components/calendar/EventDrawer';
 import { StatusBar } from 'expo-status-bar';
+import CreateEventModal from '../components/calendar/CreateEventModal';
+import CalendarFAB from '../components/calendar/CalendarFAB';
+import * as Haptics from 'expo-haptics';
+import { useRef } from 'react';
 
 export default function SyncLinkScreen() {
   const { profile, activeBondId, bondMembers } = useStore();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [creationInitialTime, setCreationInitialTime] = useState<string | undefined>();
+  const lastHapticHour = useRef(-1);
 
   const partnerProfile = activeBondId ? bondMembers[activeBondId] : null;
   const myTz = profile?.timezone || getDeviceTimezone();
@@ -67,6 +75,15 @@ export default function SyncLinkScreen() {
     setLoading(false);
   };
 
+  const handleScroll = (event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const hour = Math.floor(y / 80);
+    if (hour !== lastHapticHour.current && hour >= 0 && hour < 24) {
+      Haptics.selectionAsync();
+      lastHapticHour.current = hour;
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loader}>
@@ -89,6 +106,8 @@ export default function SyncLinkScreen() {
         style={styles.scroll} 
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         <View style={styles.parchmentContainer}>
           <TimelineRibbon 
@@ -97,15 +116,44 @@ export default function SyncLinkScreen() {
             partnerTz={partnerTz} 
             partnerName={partnerProfile?.display_name || 'Partner'}
             onEventPress={(ev: any) => setSelectedEvent(ev)}
+            onLongPressSlot={(time) => {
+              setCreationInitialTime(time);
+              setIsCreating(true);
+            }}
           />
           <SyncLine rowHeight={80} />
         </View>
       </ScrollView>
 
-      {/* Floating Add Button */}
-      <TouchableOpacity style={styles.fab} activeOpacity={0.8}>
-        <Ionicons name="add" size={32} color="#FFF" />
-      </TouchableOpacity>
+      {/* Floating Add Action Button */}
+      <CalendarFAB onAction={(type) => {
+        setCreationInitialTime(undefined);
+        setIsCreating(true);
+      }} />
+
+      {/* Creation Modal */}
+      <Modal
+        visible={isCreating}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setIsCreating(false)}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity 
+            style={{ flex: 1 }} 
+            activeOpacity={1} 
+            onPress={() => setIsCreating(false)} 
+          />
+          <CreateEventModal 
+            initialTime={creationInitialTime}
+            onClose={() => setIsCreating(false)}
+            onSuccess={fetchEvents}
+          />
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Event Drawer */}
       <Modal

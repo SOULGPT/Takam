@@ -130,6 +130,8 @@ const ChatBubble = React.memo(({
 }) => {
   if (item.is_system) {
     const isMilestone = item.content.toLowerCase().includes('milestone');
+    const isSyncLink = item.content.includes('[SYNC-LINK]');
+    
     if (isMilestone) {
       return (
         <View style={styles.milestoneContainer}>
@@ -141,6 +143,20 @@ const ChatBubble = React.memo(({
         </View>
       );
     }
+    
+    if (isSyncLink) {
+      return (
+        <View style={styles.systemBubbleWrap}>
+          <View style={[styles.systemBubble, { backgroundColor: '#D9BC8A', flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            <MaterialCommunityIcons name="link-variant" size={12} color="#3D2B1F" />
+            <Text style={[styles.systemBubbleText, { color: '#3D2B1F' }]}>
+              {item.content.replace('[SYNC-LINK]', '').trim()}
+            </Text>
+          </View>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.systemBubbleWrap}>
         <View style={styles.systemBubble}>
@@ -262,6 +278,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
+  const [now, setNow] = useState(new Date());
 
   // Context Menu State
   const [contextMenuMsg, setContextMenuMsg] = useState<Message | null>(null);
@@ -404,12 +421,14 @@ export default function ChatScreen() {
     if (!session?.user || !activeBondId) return;
 
     const fetchMessages = async () => {
+      const now = new Date().toISOString();
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('bond_id', activeBondId)
+        .or(`expires_at.is.null,expires_at.gt.${now}`)
         .order('created_at', { ascending: false })
-        .limit(50); // Load last 50 for performance
+        .limit(50);
 
       if (!error && data) {
         setMessages(data);
@@ -442,6 +461,12 @@ export default function ChatScreen() {
     fetchMessages();
     markAsRead();
   }, [activeBondId, session?.user]);
+
+  // 1c. Transient "Poof" Timer
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000); // Check every minute
+    return () => clearInterval(timer);
+  }, []);
 
   // ── 2. Real-time Subscription ────────────────────────────────────────────────
   useEffect(() => {
@@ -801,6 +826,9 @@ export default function ChatScreen() {
 
   const displayItems: any[] = [];
   messages.forEach((m, i) => {
+    // Expiry check
+    if (m.expires_at && new Date(m.expires_at) < now) return;
+    
     displayItems.push(m);
     const currentDay = new Date(m.created_at).toDateString();
     const prevDay = i < messages.length - 1 ? new Date(messages[i+1].created_at).toDateString() : null;

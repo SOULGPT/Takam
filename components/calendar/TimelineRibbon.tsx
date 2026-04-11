@@ -4,6 +4,7 @@ import dayjs, { EXCLUDED_CATEGORIES, findGreenZones, formatToTimezone } from '..
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withRepeat, withTiming, withSequence, interpolate } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 const ROW_HEIGHT = 80;
@@ -15,9 +16,17 @@ interface TimelineRibbonProps {
   partnerTz: string;
   partnerName?: string;
   onEventPress?: (event: any) => void;
+  onLongPressSlot?: (time: string) => void;
 }
 
-export default function TimelineRibbon({ events, myTz, partnerTz, partnerName = 'Partner', onEventPress }: TimelineRibbonProps) {
+export default function TimelineRibbon({ 
+  events, 
+  myTz, 
+  partnerTz, 
+  partnerName = 'Partner', 
+  onEventPress,
+  onLongPressSlot
+}: TimelineRibbonProps) {
   const dayStart = dayjs().startOf('day');
 
   // Compute Green Zones
@@ -44,7 +53,15 @@ export default function TimelineRibbon({ events, myTz, partnerTz, partnerName = 
             );
 
             return (
-              <View key={hour} style={[styles.hourRow, isGreen && styles.greenZoneRow]}>
+              <TouchableOpacity 
+                key={hour} 
+                style={[styles.hourRow, isGreen && styles.greenZoneRow]}
+                activeOpacity={0.7}
+                onLongPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+                  onLongPressSlot?.(timeUTC.toISOString());
+                }}
+              >
                 <View style={styles.timeCol}>
                   <Text style={styles.timeText}>{timeUTC.tz(myTz).format('HH:mm')}</Text>
                 </View>
@@ -58,12 +75,12 @@ export default function TimelineRibbon({ events, myTz, partnerTz, partnerName = 
                   <Text style={styles.timeText}>{timeUTC.tz(partnerTz).format('HH:mm')}</Text>
                 </View>
 
-                {isGreen && hour % 4 === 0 && (
+                {isGreen && (
                    <View style={styles.greenZoneLabel}>
                       <Text style={styles.greenZoneText}>Connection Window</Text>
                    </View>
                 )}
-              </View>
+              </TouchableOpacity>
             );
           })}
 
@@ -155,7 +172,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   greenZoneRow: {
-    backgroundColor: 'rgba(217, 188, 138, 0.1)',
+    backgroundColor: 'rgba(212, 160, 34, 0.05)',
+    borderLeftWidth: 2,
+    borderLeftColor: 'rgba(212, 160, 34, 0.3)',
+    borderRightWidth: 2,
+    borderRightColor: 'rgba(212, 160, 34, 0.3)',
   },
   timeCol: {
     flex: 1,
