@@ -845,7 +845,20 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
-        {activeBondKey === 'classic' && (
+        
+        {th.bgImage && (
+          <ImageBackground 
+            source={th.bgImage} 
+            style={StyleSheet.absoluteFill} 
+            resizeMode="cover"
+          >
+            {th.overlayOpacity && (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: th.overlayOpacity }]} />
+            )}
+          </ImageBackground>
+        )}
+
+        {activeBondKey === 'classic' && !th.bgImage && (
           <ImageBackground 
             source={chatPattern} 
             style={StyleSheet.absoluteFill} 
@@ -855,7 +868,11 @@ export default function ChatScreen() {
         )}
 
         {/* ── Ref 4 Ultra-Clean Header ── */}
-        <View style={[styles.header, { paddingTop: insets.top + 8, paddingBottom: 12, backgroundColor: 'transparent' }]}>
+        <BlurView 
+          intensity={Platform.OS === 'ios' ? 80 : 100} 
+          tint={th.id === 'midnight' || th.id === 'silk' || th.id === 'marble' ? 'dark' : 'light'}
+          style={[styles.header, { paddingTop: insets.top + 8, paddingBottom: 12 }]}
+        >
           <TouchableOpacity onPress={() => nav.goBack()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={28} color="#FFFFFF" />
           </TouchableOpacity>
@@ -889,7 +906,7 @@ export default function ChatScreen() {
                <Ionicons name="information-circle-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-        </View>
+        </BlurView>
 
         {/* Pinned Message */}
         {pinnedMessage && (
@@ -1220,8 +1237,13 @@ const styles = StyleSheet.create({
   bubbleName: { fontSize: 10, fontWeight: '800', color: '#888', textTransform: 'uppercase' },
 
   bubble: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+      android: { elevation: 2 },
+      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }
+    })
   },
   bubbleMe: {
   },
@@ -1277,8 +1299,21 @@ const styles = StyleSheet.create({
   contextButtonText: { fontSize: 15, fontWeight: '600' },
 
   systemBubbleWrap: { alignItems: 'center', marginVertical: 14 },
-  systemBubble: { paddingHorizontal: 14, paddingVertical: 4, borderRadius: 10, backgroundColor: '#262626' },
-  systemBubbleText: { fontSize: 10, fontWeight: '700', color: '#888', textTransform: 'uppercase' },
+  systemBubble: { 
+    paddingHorizontal: 14, 
+    paddingVertical: 6, 
+    borderRadius: 20, 
+    backgroundColor: 'rgba(30,30,30,0.6)', 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.05)' 
+  },
+  systemBubbleText: { 
+    fontSize: 10, 
+    fontWeight: '800', 
+    color: '#E0E0E0', 
+    textTransform: 'uppercase', 
+    letterSpacing: 1 
+  },
 
   milestoneContainer: { alignItems: 'center', marginVertical: 20 },
   milestoneIconBox: { width: 64, height: 64, borderRadius: 32, justifyContent: 'center', alignItems: 'center', marginBottom: 8, backgroundColor: '#1A1A1A' },

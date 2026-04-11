@@ -29,7 +29,7 @@ export const BOND_META: Record<BondType, { emoji: string; label: string; color: 
   other:      { emoji: '✨', label: 'Other',       color: '#B5947A' },
 };
 
-export type ChatThemeOption = 'classic' | 'midnight' | 'cherry' | 'forest' | 'ocean';
+export type ChatThemeOption = 'classic' | 'midnight' | 'cherry' | 'forest' | 'ocean' | 'silk' | 'marble';
 
 export interface ThemeConfig {
   id: ChatThemeOption;
@@ -44,6 +44,8 @@ export interface ThemeConfig {
   inputBgColor: string;
   inputTextColor: string;
   headerBgColor: string;
+  bgImage?: any;
+  overlayOpacity?: number;
 }
 
 export const CHAT_THEMES: Record<ChatThemeOption, ThemeConfig> = {
@@ -116,6 +118,54 @@ export const CHAT_THEMES: Record<ChatThemeOption, ThemeConfig> = {
     inputBgColor: '#F0F8FF',
     inputTextColor: '#1A3C56',
     headerBgColor: '#FFFFFF',
+  },
+  silk: {
+    id: 'silk',
+    name: 'Midnight Silk',
+    bgColors: ['#0A0A0E', '#0F0F1A', '#050510'],
+    textColor: '#FFFFFF',
+    myBubbleColor: '#2C3E50',
+    themBubbleColor: 'rgba(255,255,255,0.1)',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#FFFFFF',
+    borderColor: 'rgba(255,255,255,0.1)',
+    inputBgColor: '#121212',
+    inputTextColor: '#FFFFFF',
+    headerBgColor: 'rgba(10,10,14,0.8)',
+    bgImage: require('../assets/themes/midnight_silk.png'),
+    overlayOpacity: 0.3,
+  },
+  marble: {
+    id: 'marble',
+    name: 'Emerald Marble',
+    bgColors: ['#062419', '#0A3324', '#041810'],
+    textColor: '#E0E0E0',
+    myBubbleColor: '#1B4D3E',
+    themBubbleColor: 'rgba(255,255,255,0.15)',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#E0E0E0',
+    borderColor: '#1B4D3E',
+    inputBgColor: '#062419',
+    inputTextColor: '#FFFFFF',
+    headerBgColor: 'rgba(6,36,25,0.8)',
+    bgImage: require('../assets/themes/emerald_marble.png'),
+    overlayOpacity: 0.4,
+  },
+  cherry: {
+    id: 'cherry',
+    name: 'Sakura Zen',
+    bgColors: ['#FFF0F5', '#FFE4E1', '#FFC0CB'],
+    textColor: '#4A1D2C',
+    myBubbleColor: '#E75480',
+    themBubbleColor: 'rgba(255,255,255,0.8)',
+    myBubbleText: '#FFFFFF',
+    themBubbleText: '#4A1D2C',
+    borderColor: '#FFB6C1',
+    inputBgColor: '#FFF0F5',
+    inputTextColor: '#4A1D2C',
+    headerBgColor: 'rgba(255,240,245,0.8)',
+    bgImage: require('../assets/themes/cherry.png'),
+    overlayOpacity: 0.2,
   }
 };
 
