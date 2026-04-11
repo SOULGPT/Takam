@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
-import { useStore, Bond, BOND_META, BondType } from '../store/useStore';
+import { useStore, Bond, BOND_META, BondType, Group } from '../store/useStore';
 import { shadow } from '../lib/theme/shadows';
 
 // ── All 10 relationship types ─────────────────────────────────────────────────

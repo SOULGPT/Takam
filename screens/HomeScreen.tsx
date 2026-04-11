@@ -28,7 +28,9 @@ import { shadow } from '../lib/theme/shadows';
 import BlobAvatar from '../components/BlobAvatar';
 import VibeCard from '../components/VibeCard';
 import WalkieTalkieView from '../components/WalkieTalkieView';
-import { startRecording, stopRecordingAndUpload, playBurst, requestMicrophonePermission } from '../lib/walkieTalkie';
+import * as FileSystem from 'expo-file-system';
+import { useAudioRecorder, requestRecordingPermissionsAsync, AudioModule } from 'expo-audio';
+import { playBurst, decode } from '../lib/walkieTalkie';
 
 // Tap-To-Bond Feature
 import AuraGlow from '../components/AuraGlow';
@@ -63,6 +65,7 @@ const VIBES = [
 
 export default function HomeScreen() {
   const nav = useNavigation<any>();
+  const recorder = useAudioRecorder();
   const { profile, bonds, bondMembers, activeBondId, setActiveBondId, unreadCounts, groups, groupUnreadCounts, setActiveGroupId, activeGroupId } = useStore();
   const [sending, setSending] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
@@ -268,21 +271,64 @@ export default function HomeScreen() {
     }
   };
 
-  const handleStartTalk = async () => {
-    if (!(await requestMicrophonePermission())) {
-      Alert.alert('Permission Denied', 'Mic access is needed for Walkie-Talkie');
-      return;
-    }
+  const uploadVibeFile = async (uri: string) => {
+    if (!activeBondId || !profile?.id) return null;
     try {
-      await startRecording();
+      const ext = uri.split('.').pop()?.toLowerCase() || 'm4a';
+      const path = `${activeBondId}/${Date.now()}.${ext}`;
+      const mimeType = ext === 'webm' ? 'audio/webm' : 'audio/m4a';
+
+      let blob: Blob;
+      if (Platform.OS === 'web') {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      } else {
+        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const buffer = decode(base64);
+        blob = new Blob([buffer], { type: mimeType });
+      }
+
+      const { data, error } = await supabase.storage
+        .from('chat-media')
+        .upload(path, blob, { contentType: mimeType });
+
+      if (error) throw error;
+      const { data: { publicUrl } } = supabase.storage.from('chat-media').getPublicUrl(data.path);
+      return publicUrl;
+    } catch (e: any) {
+      console.error('Record Upload Error:', e);
+      return null;
+    }
+  };
+
+  const handleStartTalk = async () => {
+    try {
+      const { status } = await requestRecordingPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Mic access is needed for Walkie-Talkie');
+        return;
+      }
+      
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+      });
+
+      await recorder.prepareToRecordAsync();
+      recorder.record();
     } catch (e) {
+      console.error('Failed to start recording', e);
       Alert.alert('Error', 'Failed to start recording');
     }
   };
 
   const handleStopTalk = async () => {
     try {
-      const audioUrl = await stopRecordingAndUpload(activeBondId!, profile!.id);
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) return;
+
+      const audioUrl = await uploadVibeFile(uri);
       if (audioUrl) {
         await sendVibe(activeBondId!, 'walkie_burst', audioUrl);
       }

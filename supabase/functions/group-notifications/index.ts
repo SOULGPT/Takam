@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
-serve(async (req) => {
+serve(async (req: Request) => {
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

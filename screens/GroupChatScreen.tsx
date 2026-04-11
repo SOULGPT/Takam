@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   textThem: { color: '#E0E0E0' },
 
   systemBubbleWrap: { alignItems: 'center', marginVertical: 16 },
-  systemBubble: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderHorizontalWidth: 1, borderColor: 'rgba(196, 168, 130, 0.3)' },
+  systemBubble: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(196, 168, 130, 0.3)' },
   systemBubbleText: { color: '#C4A882', fontSize: 10, fontWeight: '800', textTransform: 'uppercase' },
 
   vibeCardWrap: { alignItems: 'center', marginVertical: 12 },
