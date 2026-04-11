@@ -68,7 +68,7 @@ export default function GroupSettingsScreen() {
         .update({ role: newRole })
         .eq('id', member.id);
       
-      const newMembers = members.map(m => m.id === member.id ? { ...m, role: newRole } : m);
+      const newMembers = members.map(m => m.id === member.id ? { ...m, role: newRole as any } : m);
       setGroupMembers(group!.id, newMembers);
     } catch (e: any) {
       Alert.alert('Error', e.message);
