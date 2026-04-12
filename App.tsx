@@ -9,9 +9,10 @@ import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import TabNavigator from './navigation/TabNavigator';
-import ChatScreen from './screens/ChatScreen';
-import GroupChatScreen from './screens/GroupChatScreen';
 import GroupSettingsScreen from './screens/GroupSettingsScreen';
+import CallScreen from './screens/CallScreen';
+import { IncomingCallOverlay } from './components/Call/IncomingCallOverlay';
+import { useCallStore } from './store/useCallStore';
 import { Session } from '@supabase/supabase-js';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AdminNavigator from './navigation/AdminNavigator';
@@ -318,8 +319,33 @@ function AppCore() {
       )
       .subscribe();
 
+    // ── Global Call Listener (Incoming) ─────────────────────────────────────
+    const callWatcher = supabase
+      .channel('global_call_watcher')
+      .on('broadcast', { event: 'OFFER' }, async (payload: any) => {
+        const state = useStore.getState();
+        const callState = useCallStore.getState();
+        
+        // If we are already in a call, ignore
+        if (callState.status !== 'idle') return;
+
+        // Find the caller from existing bond partners
+        const callerBond = state.bonds.find(b => b.id === payload.activeBondId || b.id === payload.bondId);
+        if (!callerBond) return;
+        
+        const myId = session.user.id;
+        const partnerId = callerBond.user_a === myId ? callerBond.user_b : callerBond.user_a;
+        const partnerProfile = state.bondMembers[callerBond.id];
+
+        if (partnerProfile) {
+          useCallStore.getState().receiveCall(callerBond.id, partnerProfile);
+        }
+      })
+      .subscribe();
+
     return () => {
       supabase.removeChannel(globalChannel);
+      supabase.removeChannel(callWatcher);
     };
   }, [session?.user?.id]);
 
@@ -413,9 +439,11 @@ function AppCore() {
         <RootStack.Screen name="Chat" component={ChatScreen} />
         <RootStack.Screen name="GroupChat" component={GroupChatScreen} />
         <RootStack.Screen name="GroupSettings" component={GroupSettingsScreen} />
+        <RootStack.Screen name="Call" component={CallScreen} />
         <RootStack.Screen name="Admin" component={AdminNavigator} />
         <RootStack.Screen name="Upgrade" component={UpgradeScreen} options={{ presentation: 'modal' }} />
       </RootStack.Navigator>
+      <IncomingCallOverlay />
     </NavigationContainer>
   );
 }

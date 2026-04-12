@@ -34,6 +34,7 @@ import { Ionicons, MaterialCommunityIcons, Feather } from '@expo/vector-icons';
 import { playBurst } from '../lib/walkieTalkie';
 import chatPattern from '../assets/chat-bg-pattern.png';
 import { AVATARS } from '../utils/avatars';
+import { useCallStore } from '../store/useCallStore';
 
 type Message = {
   id: string;
@@ -319,6 +320,14 @@ export default function ChatScreen() {
 
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+
+  const { status: callStatus, initiateCall } = useCallStore();
+
+  const handleStartCall = () => {
+    if (!activeBondId) return;
+    initiateCall(activeBondId);
+    nav.navigate('Call');
+  };
 
   const handleChangeTheme = async (newTheme: ChatThemeOption) => {
     setThemePickerVisible(false);
@@ -899,7 +908,7 @@ export default function ChatScreen() {
             <TouchableOpacity style={styles.headerActionBtn}>
               <Ionicons name="call-outline" size={22} color="#FFFFFF" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerActionBtn}>
+            <TouchableOpacity style={styles.headerActionBtn} onPress={handleStartCall}>
               <Ionicons name="videocam-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerActionBtn} onPress={() => setThemePickerVisible(true)}>

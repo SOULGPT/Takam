@@ -18,7 +18,9 @@
       "usesAppleSignIn": true,
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Used for gift delivery address.",
-        "NFCReaderUsageDescription": "Tap-to-Bond uses NFC to securely connect you with your partner."
+        "NFCReaderUsageDescription": "Tap-to-Bond uses NFC to securely connect you with your partner.",
+        "NSCameraUsageDescription": "Allow TAKAM to access your camera for the Private Sanctuary.",
+        "NSMicrophoneUsageDescription": "Allow TAKAM to access your microphone for the Private Sanctuary."
       },
       "entitlements": {
         "com.apple.developer.nfc.readersession.formats": [
@@ -67,7 +69,8 @@
           "includeNdefEntitlement": true
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "react-native-webrtc"
     ],
     "extra": {
       "eas": {
