@@ -283,7 +283,9 @@ export default function HomeScreen() {
         const response = await fetch(uri);
         blob = await response.blob();
       } else {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const { File } = await import('expo-file-system');
+        const file = new File(uri);
+        const base64 = await file.base64();
         const buffer = decode(base64);
         blob = new Blob([buffer], { type: mimeType });
       }

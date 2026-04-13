@@ -32,8 +32,12 @@ export function useNfcHandshake() {
         return;
       }
       setHandshakeId(newId);
-    } catch (e) {
-      console.error('Handshake rotation error:', e);
+    } catch (e: any) {
+      if (e.message?.includes('Network request failed')) {
+        console.warn('Networking drop during handshake rotation - retrying on next tick.');
+      } else {
+        console.error('Handshake rotation error:', e);
+      }
     }
   }, [profile?.id]);
 

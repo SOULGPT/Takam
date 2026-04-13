@@ -1,3 +1,4 @@
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import React, { useEffect, useState } from 'react';
 import './global.css';
 import { ActivityIndicator, View, StyleSheet, AppState, Platform } from 'react-native';
@@ -9,6 +10,8 @@ import LandingScreen from './screens/LandingScreen';
 import AuthScreen from './screens/AuthScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import TabNavigator from './navigation/TabNavigator';
+import ChatScreen from './screens/ChatScreen';
+import GroupChatScreen from './screens/GroupChatScreen';
 import GroupSettingsScreen from './screens/GroupSettingsScreen';
 import CallScreen from './screens/CallScreen';
 import { IncomingCallOverlay } from './components/Call/IncomingCallOverlay';
@@ -22,6 +25,7 @@ import { signInWithApple } from './lib/auth/apple';
 import { 
   useFonts, 
   CormorantGaramond_400Regular, 
+  CormorantGaramond_400Regular_Italic,
   CormorantGaramond_700Bold 
 } from '@expo-google-fonts/cormorant-garamond';
 import { 
@@ -56,6 +60,7 @@ function AppCore() {
 
   const [fontsLoaded] = useFonts({
     CormorantGaramond_400Regular,
+    CormorantGaramond_400Regular_Italic,
     CormorantGaramond_700Bold,
     Caveat_400Regular,
     Caveat_700Bold,
@@ -450,11 +455,13 @@ function AppCore() {
 
 export default function App() {
   return (
-    <View style={styles.webRoot}>
-      <View style={styles.webContainer}>
-        <AppCore />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={styles.webRoot}>
+        <View style={styles.webContainer}>
+          <AppCore />
+        </View>
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 

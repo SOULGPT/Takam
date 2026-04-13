@@ -84,6 +84,36 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    Alert.alert(
+      'Dissolve Bond ✦',
+      'This action is irreversible. All messages, gifts, and memories will be permanently dissolved. Are you absolutely certain?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Permanently Dissolve', 
+          style: 'destructive',
+          onPress: async () => {
+             setLoading(true);
+             try {
+                // Total Wipe Ritual
+                const { error: profileError } = await supabase.from('profiles').delete().eq('id', profile?.id);
+                if (profileError) throw profileError;
+                
+                await supabase.auth.signOut();
+                reset();
+                Alert.alert('Dissolved ✦', 'Your presence has been successfully untethered from TAKAM.');
+             } catch (e: any) {
+                Alert.alert('Error', e.message);
+             } finally {
+                setLoading(false);
+             }
+          }
+        }
+      ]
+    );
+  };
+
   const tierLabel = profile?.subscription_tier === 'ritual' ? '✦ Ritual' : 'Free';
   const tierColor = profile?.subscription_tier === 'ritual' ? '#C9705A' : '#8C6246';
 
@@ -264,6 +294,14 @@ export default function ProfileScreen() {
             <Text style={styles.signOutText}>Sign Out</Text>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDeleteAccount}
+          disabled={loading}
+        >
+          <Text style={styles.deleteText}>Dissolve Bond (Delete Account)</Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -357,6 +395,18 @@ const styles = StyleSheet.create({
     borderColor: '#C9705A40',
   },
   signOutText: { fontSize: 15, fontWeight: '700', color: '#9B3D2C' },
+  deleteButton: {
+    marginTop: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  deleteText: {
+    fontSize: 13,
+    color: '#9B3D2C',
+    opacity: 0.6,
+    textDecorationLine: 'underline',
+    fontFamily: 'CormorantGaramond_400Regular_Italic',
+  },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   inputLabel: { fontSize: 12, color: '#8C6246', fontWeight: '600', marginBottom: 4, marginLeft: 2 },
   input: {

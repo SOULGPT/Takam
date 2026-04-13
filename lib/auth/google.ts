@@ -6,6 +6,7 @@ import { supabase } from '../supabase';
 if (Platform.OS !== 'web') {
   GoogleSignin.configure({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    iosClientId: 'com.googleusercontent.apps.631733089392-uq1nau14bjmftq0d08021r5c4u0d92mq', // <--- REPLACE THIS 
     scopes: ['profile', 'email'],
   });
 }

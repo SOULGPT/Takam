@@ -14,20 +14,28 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.takam.app",
+      "bundleIdentifier": "com.takams.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "privacyPolicyUrl": "https://takam.app/privacy",
       "usesAppleSignIn": true,
+      "config": {
+        "googleMapsApiKey": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8QY"
+      },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Used for gift delivery address.",
+        "NSLocationWhenInUseUsageDescription": "Used for gift delivery address. The Sanctuary needs to know where your presence manifests.",
         "NFCReaderUsageDescription": "Tap-to-Bond uses NFC to securely connect you with your partner.",
-        "NSCameraUsageDescription": "Allow TAKAM to access your camera for the Private Sanctuary.",
-        "NSMicrophoneUsageDescription": "Allow TAKAM to access your microphone for the Private Sanctuary."
+        "NSCameraUsageDescription": "Allow TAKAM to bridge your sight. The Sanctuary requires your presence to manifest the bond.",
+        "NSMicrophoneUsageDescription": "Allow TAKAM to bridge your sound. Your voices are the resonance of this private space.",
+        "NSPhotoLibraryUsageDescription": "Allow TAKAM to access your memories to share as digital gifts.",
+        "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
         "com.apple.developer.nfc.readersession.formats": [
           "NDEF",
           "TAG"
         ]
-      }
+      },
+      "bitcode": false
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +43,7 @@
         "backgroundColor": "#F5ECD7"
       },
       "package": "com.takam.app",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "android.nfc.action.NDEF_DISCOVERED",
@@ -44,7 +53,27 @@
               "host": "takam.app"
             }
           ]
+        },
+        {
+          "action": "android.nfc.action.NDEF_DISCOVERED",
+          "data": [
+            {
+              "protocol": "https",
+              "host": "takam.app"
+            }
+          ]
         }
+      ],
+      "permissions": [
+        "android.permission.NFC",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.WAKE_LOCK",
+        "android.permission.BLUETOOTH"
       ]
     },
     "web": {
@@ -59,7 +88,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.YOUR_IOS_CLIENT_ID"
+          "iosUrlScheme": "com.googleusercontent.apps.631733089392-uq1nau14bjmftq0d08021r5c4u0d92mq"
         }
       ],
       [
@@ -70,12 +99,18 @@
         }
       ],
       "expo-audio",
-      "react-native-webrtc"
+      "@config-plugins/react-native-webrtc"
     ],
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "f795a59b-4014-45f5-81e0-e55955d6ffeb"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f795a59b-4014-45f5-81e0-e55955d6ffeb"
     }
   }
 }

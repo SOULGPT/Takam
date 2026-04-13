@@ -46,8 +46,12 @@ yarn-error.*
 /android
 
 # TAKAM Local Secrets
+.env*
 .env.local
 supabase/functions/.env
+ios/
+android/
+app.json.*
 expo_error.txt
 *.log
 *.txt

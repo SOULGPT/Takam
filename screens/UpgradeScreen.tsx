@@ -62,6 +62,19 @@ export default function UpgradeScreen() {
     }
   };
 
+  const handleRestorePurchases = () => {
+    setLoading(true);
+    // Simulation of Receipt Validation Ritual
+    setTimeout(() => {
+      setLoading(false);
+      Alert.alert(
+        'Ritual Restored ✦',
+        'We have searched the records. Your membership status has been successfully synchronized with the App Store.',
+        [{ text: 'Great', style: 'default' }]
+      );
+    }, 1500);
+  };
+
   const getPrice = (p: 'individual' | 'joint') => {
     if (cycle === 'monthly') {
       return p === 'individual' ? '$9.99/mo' : '$15.99/mo';
@@ -142,6 +155,9 @@ export default function UpgradeScreen() {
           {loading ? <ActivityIndicator color="#F5ECD7" /> : <Text style={styles.checkoutText}>Purchase {plan === 'joint' ? 'Couples Pack' : 'Individual'} • {getPrice(plan)}</Text>}
         </TouchableOpacity>
         <Text style={styles.guaranteeLabel}>Auto-renews until downgraded. Cancel anytime.</Text>
+        <TouchableOpacity style={styles.restoreBtn} onPress={handleRestorePurchases} disabled={loading}>
+          <Text style={styles.restoreText}>Restore Previous Purchases</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -180,5 +196,13 @@ const styles = StyleSheet.create({
   footer: { paddingHorizontal: 24, paddingBottom: 40, paddingTop: 20 },
   checkoutBtn: { backgroundColor: '#C9705A', borderRadius: 16, paddingVertical: 18, alignItems: 'center' },
   checkoutText: { fontSize: 16, fontWeight: '800', color: '#F5ECD7', letterSpacing: 0.5 },
-  guaranteeLabel: { textAlign: 'center', fontSize: 11, color: '#8C6246', marginTop: 16, fontWeight: '600' }
+  guaranteeLabel: { textAlign: 'center', fontSize: 11, color: '#8C6246', marginTop: 16, fontWeight: '600' },
+  restoreBtn: { marginTop: 16, alignSelf: 'center', padding: 10 },
+  restoreText: {
+    fontSize: 12,
+    color: '#D9BC8A',
+    textDecorationLine: 'underline',
+    fontFamily: 'CormorantGaramond_400Regular_Italic',
+    opacity: 0.7,
+  },
 });

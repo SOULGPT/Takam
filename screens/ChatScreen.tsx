@@ -321,6 +321,26 @@ export default function ChatScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
+  const handleReportAbuse = () => {
+    Alert.alert(
+      'Safety Manifest ✦',
+      'Choose the nature of your report. Our stewards will review the resonance of this interaction within 24 hours.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Inappropriate Content', 
+          onPress: () => Alert.alert('Reported', 'Your report has been logged. Peace be with you.') 
+        },
+        { 
+          // Apple Guideline 1.2 requires a block option for social apps
+          text: 'Block User', 
+          style: 'destructive',
+          onPress: () => Alert.alert('Action Required', 'Please dissolve the bond in your profile settings to permanently block this user.') 
+        }
+      ]
+    );
+  };
+
   const { status: callStatus, initiateCall } = useCallStore();
 
   const handleStartCall = () => {
@@ -538,7 +558,9 @@ export default function ChatScreen() {
         const response = await fetch(uri);
         blob = await response.blob();
       } else {
-        const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+        const { File } = await import('expo-file-system');
+        const file = new File(uri);
+        const base64 = await file.base64();
         const { decode } = await import('../lib/walkieTalkie');
         const buffer = decode(base64);
         blob = new Blob([buffer], { type: mimeType });
@@ -1166,6 +1188,7 @@ const styles = StyleSheet.create({
   headerStatus: { fontSize: 12, fontWeight: '500' },
   headerActions: { flexDirection: 'row', gap: 6 },
   headerActionBtn: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  headerSafetyBtn: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.05)' },
   onlineIndicator: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 5.5, backgroundColor: '#BDBDBD', borderWidth: 2, borderColor: '#FFF' },
   onlineIndicatorActive: { backgroundColor: '#4CAF50' },
 

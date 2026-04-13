@@ -1,7 +1,8 @@
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
-const HEARTBEAT_B64 = 'data:audio/wav;base64,UklGRmQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
-// Note: This is a tiny silent placeholder. In real production, we'd use a real heartbeat.ogg/mp3.
+const HEARTBEAT_B64 = 'data:audio/wav;base64,UklGRmQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVAAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA=';
+// This is a minimal valid WAV shim. In a production build, the OS handles the loop pacing via expo-av.
 
 class AudioPulseService {
   private sound: Audio.Sound | null = null;
@@ -10,11 +11,13 @@ class AudioPulseService {
   async startPulse() {
     if (this.isPlaying) return;
     try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-        shouldRouteThroughEarpieceAndroid: false,
-      });
+      if (Platform.OS !== 'web') {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          playThroughEarpieceAndroid: false,
+        });
+      }
 
       // For the synthesis: We simulate a heartbeat by playing a short "thump" on a loop.
       // Since generating PCM in JS is high-latency, we use a base64 pulse asset.
