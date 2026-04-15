@@ -19,7 +19,7 @@
       "privacyPolicyUrl": "https://takam.app/privacy",
       "usesAppleSignIn": true,
       "config": {
-        "googleMapsApiKey": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8QY"
+        "googleMapsApiKey": ""
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Used for gift delivery address. The Sanctuary needs to know where your presence manifests.",

@@ -9,7 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Animated,
+  Animated as RNAnimated,
   Modal,
   Alert,
   Dimensions,
@@ -20,7 +20,21 @@ import * as Haptics from 'expo-haptics';
 import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { createAudioPlayer, useAudioRecorder, useAudioRecorderState, RecordingPresets, requestRecordingPermissionsAsync } from 'expo-audio';
+import { 
+  createAudioPlayer, 
+  useAudioRecorder, 
+  useAudioRecorderState, 
+  RecordingPresets, 
+  requestRecordingPermissionsAsync 
+} from 'expo-audio';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withRepeat, 
+  withSequence, 
+  withTiming, 
+  interpolateColor 
+} from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -55,6 +69,8 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
   const [player] = useState(() => createAudioPlayer(uri));
   const [pos, setPos] = useState(0);
   const [duration, setDuration] = useState(1);
+  
+  const pulse = useSharedValue(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -71,6 +87,34 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
     };
   }, [player]);
 
+  useEffect(() => {
+    if (playing) {
+      pulse.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 1000 }),
+          withTiming(0, { duration: 1000 })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulse.value = withTiming(0);
+    }
+  }, [playing]);
+
+  const animatedGlow = useAnimatedStyle(() => {
+    return {
+      shadowOpacity: pulse.value * 0.8,
+      shadowRadius: 10 + pulse.value * 10,
+      borderColor: interpolateColor(
+        pulse.value,
+        [0, 1],
+        ['#3A3B3D', '#C0624A']
+      ),
+      elevation: pulse.value * 5,
+    };
+  });
+
   const togglePlayback = () => {
     if (player.playing) {
       player.pause();
@@ -80,18 +124,21 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
     }
   };
 
-
   const progress = (pos / duration) * 100;
 
   return (
-    <View style={[styles.audioBubbleContainer, { backgroundColor: '#262729', borderRadius: 12, borderWidth: 1, borderColor: '#3A3B3D' }]}>
+    <Animated.View style={[
+      styles.audioBubbleContainer, 
+      { backgroundColor: '#262729', borderRadius: 12, borderWidth: 1, shadowColor: '#C0624A' },
+      animatedGlow
+    ]}>
       <TouchableOpacity onPress={togglePlayback} style={{ padding: 4 }}>
-        <Ionicons name={playing ? 'pause' : 'play'} size={20} color="#D2D3D5" />
+        <Ionicons name={playing ? 'pause' : 'play'} size={20} color={playing ? '#C0624A' : "#D2D3D5"} />
       </TouchableOpacity>
       
       <View style={styles.audioMeta}>
         <View style={styles.track}>
-          <View style={[styles.progress, { width: `${progress}%`, backgroundColor: '#FFF' }]} />
+          <View style={[styles.progress, { width: `${progress}%`, backgroundColor: playing ? '#C0624A' : '#FFF' }]} />
         </View>
         <Text style={[styles.audioTime, { color: '#E0E0E0' }]}>
           {Math.floor(pos / 1000)}:{(Math.floor(pos / 10) % 100).toString().padStart(2, '0')} / {Math.floor(duration / 1000)}:{(Math.floor(duration / 10) % 100).toString().padStart(2, '0')}
@@ -99,9 +146,9 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
       </View>
 
       <TouchableOpacity style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#343B4B', justifyContent: 'center', alignItems: 'center' }}>
-        <Ionicons name="close" size={16} color="#E0E0E0" />
+        <Ionicons name="mic-outline" size={16} color={playing ? '#C0624A' : "#E0E0E0"} />
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -289,12 +336,12 @@ export default function ChatScreen() {
   const [isRecordingLocked, setIsRecordingLocked] = useState(false);
   const [previewPlaying, setPreviewPlaying] = useState(false);
   const [previewPlayer, setPreviewPlayer] = useState<any>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const fadeAnim = useRef(new RNAnimated.Value(0)).current;
+  const scaleAnim = useRef(new RNAnimated.Value(0)).current;
 
-  const slideX = useRef(new Animated.Value(0)).current;
-  const slideY = useRef(new Animated.Value(0)).current;
-  const lockAnim = useRef(new Animated.Value(0)).current;
+  const slideX = useRef(new RNAnimated.Value(0)).current;
+  const slideY = useRef(new RNAnimated.Value(0)).current;
+  const lockAnim = useRef(new RNAnimated.Value(0)).current;
 
   // Cleanup preview player
   useEffect(() => {
@@ -379,16 +426,16 @@ export default function ChatScreen() {
     setContextPos({ x, y: clampedY });
     setContextMenuMsg(msg);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: Platform.OS !== 'web' })
+    RNAnimated.parallel([
+      RNAnimated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: Platform.OS !== 'web' }),
+      RNAnimated.spring(scaleAnim, { toValue: 1, friction: 6, tension: 80, useNativeDriver: Platform.OS !== 'web' })
     ]).start();
   };
 
   const closeContextMenu = () => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
-      Animated.timing(scaleAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' })
+    RNAnimated.parallel([
+      RNAnimated.timing(fadeAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' }),
+      RNAnimated.timing(scaleAnim, { toValue: 0, duration: 150, useNativeDriver: Platform.OS !== 'web' })
     ]).start(() => setContextMenuMsg(null));
   };
 
@@ -973,11 +1020,11 @@ export default function ChatScreen() {
         {/* Context Menu Modal */}
         <Modal visible={!!contextMenuMsg} transparent animationType="none" onRequestClose={closeContextMenu}>
           <View style={StyleSheet.absoluteFill}>
-            <Animated.View style={[styles.contextBackdrop, { opacity: fadeAnim }]}>
+            <RNAnimated.View style={[styles.contextBackdrop, { opacity: fadeAnim }]}>
               <TouchableOpacity style={StyleSheet.absoluteFill} onPress={closeContextMenu} activeOpacity={1} />
-            </Animated.View>
+            </RNAnimated.View>
 
-            <Animated.View style={[
+            <RNAnimated.View style={[
               styles.contextMenu,
               {
                 top: contextPos.y - 60,
@@ -1002,7 +1049,7 @@ export default function ChatScreen() {
                   <Text style={[styles.contextButtonText, { color: '#D32F2F' }]}>⚠️ Report</Text>
                 </TouchableOpacity>
               </View>
-            </Animated.View>
+            </RNAnimated.View>
           </View>
         </Modal>
 
@@ -1059,7 +1106,7 @@ export default function ChatScreen() {
 
           {/* ── Hovering Recording Popover (Antigravity Style) ── */}
           {(isRecording || recordingPreviewUri) && (
-            <Animated.View style={[styles.hoverRecordingPill, { backgroundColor: '#202124', borderColor: '#333' }]}>
+            <RNAnimated.View style={[styles.hoverRecordingPill, { backgroundColor: '#202124', borderColor: '#333' }]}>
               {isRecording ? (
                 // Live Recording UI
                 <>
@@ -1100,7 +1147,7 @@ export default function ChatScreen() {
                   </View>
                 </>
               )}
-            </Animated.View>
+            </RNAnimated.View>
           )}
 
           {/* ── Standard Text Input Pill ── */}

@@ -13,7 +13,7 @@ let recordingInstance: any = null;
 export const playBurst = async (url: string, onFinish?: () => void) => {
   try {
     await AudioModule.setAudioModeAsync({
-      allowsRecording: false, // Don't block background audio when just playing if possibly
+      allowsRecording: true, // Use PlayAndRecord context but route to speaker
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: 'duckOthers',

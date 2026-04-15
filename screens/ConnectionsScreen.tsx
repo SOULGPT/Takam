@@ -12,6 +12,10 @@ import {
   Platform,
   TextInput,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
+import { DissolveModal } from '../components/DissolveModal';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../lib/supabase';
@@ -58,6 +62,20 @@ function BondCard({
   const isCreator = bond.user_a === myId;
   const isActionable = isRequested || isPending;
 
+  const renderRightActions = () => {
+    return (
+      <TouchableOpacity 
+        style={styles.deleteAction} 
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          onRemove();
+        }}
+      >
+        <Ionicons name="trash-outline" size={24} color="#FFF" />
+      </TouchableOpacity>
+    );
+  };
+
   const copyCode = () => {
     if (Platform.OS === 'web') {
       navigator.clipboard?.writeText(bond.bond_code)
@@ -76,86 +94,97 @@ function BondCard({
   }
 
   return (
-    <TouchableOpacity
-      style={[styles.bondCard, isActive && styles.bondCardActive]}
-      onPress={isActionable ? undefined : onSetActive}
-      activeOpacity={isActionable ? 1 : 0.85}
-    >
-      {isActive && <View style={[styles.activeStripe, { backgroundColor: meta.color }]} />}
+    <Swipeable renderRightActions={renderRightActions}>
+      <TouchableOpacity
+        style={[styles.bondCard, isActive && styles.bondCardActive]}
+        onPress={isActionable ? undefined : onSetActive}
+        activeOpacity={isActionable ? 1 : 0.85}
+      >
+        {isActive && <View style={[styles.activeStripe, { backgroundColor: meta.color }]} />}
 
-      <View style={styles.cardRow}>
-        <View style={[styles.avatar, { backgroundColor: meta.color }]}>
-          <Text style={styles.avatarText}>
-            {isPending ? '?' : initials(partnerName || '?')}
-          </Text>
-        </View>
-
-        <View style={styles.cardInfo}>
-          <View style={styles.cardNameRow}>
-            <Text style={styles.cardName} numberOfLines={1}>
-              {titleText}
+        <View style={styles.cardRow}>
+          <View style={[styles.avatar, { backgroundColor: meta.color }]}>
+            <Text style={styles.avatarText}>
+              {isPending ? '?' : initials(partnerName || '?')}
             </Text>
-            {isActive && !isActionable && (
-              <View style={[styles.activeBadge, { backgroundColor: meta.color + '22', borderColor: meta.color }]}>
-                <Text style={[styles.activeBadgeText, { color: meta.color }]}>Active</Text>
-              </View>
-            )}
           </View>
 
-          <View style={styles.typeBadgeRow}>
-            <Text style={styles.typeEmoji}>{meta.emoji}</Text>
-            <Text style={styles.typeLabel}>{meta.label}</Text>
-            {isPending && (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingPillText}>Pending</Text>
-              </View>
-            )}
-          </View>
-
-          {isPending && isCreator && (
-            <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.75}>
-              <Text style={styles.codeText}>{bond.bond_code}</Text>
-              <Text style={styles.copyLabel}>📋 Copy</Text>
-            </TouchableOpacity>
-          )}
-
-          {isRequested && isCreator && onAccept && onReject && (
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity style={styles.btnAccept} onPress={onAccept}>
-                <Text style={styles.btnAcceptText}>Accept</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnReject} onPress={onReject}>
-                <Text style={styles.btnRejectText}>Reject</Text>
-              </TouchableOpacity>
+          <View style={styles.cardInfo}>
+            <View style={styles.cardNameRow}>
+              <Text style={styles.cardName} numberOfLines={1}>
+                {titleText}
+              </Text>
+              {isActive && !isActionable && (
+                <View style={[styles.activeBadge, { backgroundColor: meta.color + '22', borderColor: meta.color }]}>
+                  <Text style={[styles.activeBadgeText, { color: meta.color }]}>Active</Text>
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <TouchableOpacity
-          style={styles.menuBtn}
-          onPress={() => {
-            const options: any[] = [];
-            if (!isActionable) {
-              options.push({ text: '✦ Set as Active', onPress: onSetActive });
-            }
-            options.push({
-              text: isActionable ? 'Cancel & Delete' : 'Remove Connection',
-              style: 'destructive',
-              onPress: onRemove,
-            });
-            options.push({ text: 'Cancel', style: 'cancel' });
-            Alert.alert(
-              isActionable ? 'Pending Bond' : partnerName,
-              isActionable ? 'What would you like to do?' : `Manage your ${meta.label} bond`,
-              options,
-            );
-          }}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuDots}>•••</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
+            <View style={styles.typeBadgeRow}>
+              <Text style={styles.typeEmoji}>{meta.emoji}</Text>
+              <Text style={styles.typeLabel}>{meta.label}</Text>
+              {isPending && (
+                <View style={styles.pendingPill}>
+                  <Text style={styles.pendingPillText}>Pending</Text>
+                </View>
+              )}
+            </View>
+
+            {isPending && isCreator && (
+              <TouchableOpacity style={styles.codeRow} onPress={copyCode} activeOpacity={0.75}>
+                <Text style={styles.codeText}>{bond.bond_code}</Text>
+                <Text style={styles.copyLabel}>📋 Copy</Text>
+              </TouchableOpacity>
+            )}
+
+            {isRequested && isCreator && onAccept && onReject && (
+              <View style={styles.actionButtonsRow}>
+                <TouchableOpacity style={styles.btnAccept} onPress={onAccept}>
+                  <Text style={styles.btnAcceptText}>Accept</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.btnReject} onPress={onReject}>
+                  <Text style={styles.btnRejectText}>Reject</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.menuBtn}
+            onPress={() => {
+              const options: any[] = [];
+              if (!isActionable) {
+                options.push({ text: '✦ Set as Active', onPress: onSetActive });
+              }
+              options.push({
+                text: 'Remove Connection',
+                style: 'destructive',
+                onPress: onRemove,
+              });
+              options.push({
+                text: 'Block User',
+                style: 'destructive',
+                onPress: () => {
+                   Alert.alert('Block User', `This will block ${partnerName} and dissolve the bond.`);
+                   onRemove();
+                },
+              });
+              options.push({ text: 'Cancel', style: 'cancel' });
+              
+              Alert.alert(
+                isActionable ? 'Pending Bond' : partnerName,
+                isActionable ? 'What would you like to do?' : `Manage your ${meta.label} bond`,
+                options,
+              );
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.menuDots}>•••</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    </Swipeable>
   );
 }
 
@@ -241,6 +270,8 @@ export default function ConnectionsScreen() {
   const [pendingBond, setPendingBond] = useState<Bond | null>(null);
   const [pendingGroup, setPendingGroup] = useState<Group | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [pendingDissolveBond, setPendingDissolveBond] = useState<Bond | null>(null);
 
   const handleCreate = async () => {
     if (!session?.user) return;
@@ -419,24 +450,19 @@ export default function ConnectionsScreen() {
   };
 
   const handleRemove = (bond: Bond) => {
-    const meta = BOND_META[bond.bond_type] ?? BOND_META.other;
-    const partner = bondMembers[bond.id];
-    const partnerName = partner?.display_name ?? 'this connection';
-    Alert.alert(
-      'Remove Connection',
-      `Remove your ${meta.label} bond with ${partnerName}? This cannot be undone.`,
-      [
-        { text: 'Keep', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            await supabase.from('bonds').delete().eq('id', bond.id);
-            removeBond(bond.id);
-          },
-        },
-      ],
-    );
+    setPendingDissolveBond(bond);
+  };
+
+  const confirmDissolve = async () => {
+    if (!pendingDissolveBond) return;
+    try {
+      await supabase.from('bonds').delete().eq('id', pendingDissolveBond.id);
+      removeBond(pendingDissolveBond.id);
+      setPendingDissolveBond(null);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
   };
 
   const handleSetActive = (bondId: string) => {
@@ -520,6 +546,17 @@ export default function ConnectionsScreen() {
             </LinearGradient>
           </TouchableOpacity>
         )}
+
+        <DissolveModal
+          visible={!!pendingDissolveBond}
+          onCancel={() => setPendingDissolveBond(null)}
+          onConfirm={confirmDissolve}
+          partnerName={
+            pendingDissolveBond 
+              ? (bondMembers[pendingDissolveBond.id]?.display_name || bondMembers[pendingDissolveBond.id]?.username || 'this user')
+              : ''
+          }
+        />
       </View>
     );
   }
@@ -832,6 +869,15 @@ const styles = StyleSheet.create({
     borderColor: '#D9BC8A',
     overflow: 'hidden',
     ...shadow('#3D2B1F', { width: 0, height: 3 }, 0.07, 10, 4),
+  },
+  deleteAction: {
+    backgroundColor: '#C0624A',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    height: '100%',
+    borderRadius: 20,
+    marginLeft: 10,
   },
   bondCardActive: { borderColor: '#C9705A' },
   activeStripe: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },

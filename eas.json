@@ -8,22 +8,22 @@
       "developmentClient": true,
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://lbjsqukecleknnynhqxj.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxianNxdWtlY2xla25ueW5ocXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTc5NTcsImV4cCI6MjA5MTIzMzk1N30.mJG9KSFjxW2twmnyAW9z7Qc_8S5It8-irXrCamhVDGc",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "631733089392-1337s2bb31mu2b53kq6qj8i5kuvbqets.apps.googleusercontent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_YOUR_KEY",
-        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8Q"
+        "EXPO_PUBLIC_SUPABASE_URL": "",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": ""
       },
       "channel": "development"
     },
     "preview": {
       "distribution": "internal",
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://lbjsqukecleknnynhqxj.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxianNxdWtlY2xla25ueW5ocXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTc5NTcsImV4cCI6MjA5MTIzMzk1N30.mJG9KSFjxW2twmnyAW9z7Qc_8S5It8-irXrCamhVDGc",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "631733089392-1337s2bb31mu2b53kq6qj8i5kuvbqets.apps.googleusercontent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_test_YOUR_KEY",
-        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8Q"
+        "EXPO_PUBLIC_SUPABASE_URL": "",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": ""
       },
       "channel": "preview"
     },
@@ -32,11 +32,11 @@
       "channel": "production",
       "autoIncrement": true,
       "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://lbjsqukecleknnynhqxj.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxianNxdWtlY2xla25ueW5ocXhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NTc5NTcsImV4cCI6MjA5MTIzMzk1N30.mJG9KSFjxW2twmnyAW9z7Qc_8S5It8-irXrCamhVDGc",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "631733089392-1337s2bb31mu2b53kq6qj8i5kuvbqets.apps.googleusercontent.com",
-        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_live_YOUR_KEY",
-        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8Q"
+        "EXPO_PUBLIC_SUPABASE_URL": "",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "",
+        "EXPO_PUBLIC_GOOGLE_PLACES_KEY": ""
       }
     }
   },

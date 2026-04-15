@@ -52,6 +52,8 @@ supabase/functions/.env
 ios/
 android/
 app.json.*
+google-services.json
+GoogleService-Info.plist
 expo_error.txt
 *.log
 *.txt
