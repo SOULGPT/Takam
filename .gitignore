@@ -30,11 +30,6 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-.env*.local
-.env.local
-.env
-
 # Supabase local
 .supabase/
 
@@ -46,14 +41,7 @@ yarn-error.*
 /android
 
 # TAKAM Local Secrets
-.env*
-.env.local
-supabase/functions/.env
-ios/
-android/
 app.json.*
-google-services.json
-GoogleService-Info.plist
 expo_error.txt
 *.log
 *.txt
