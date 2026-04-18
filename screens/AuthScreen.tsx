@@ -12,6 +12,10 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ScrollView,
+<<<<<<< HEAD
+=======
+  Linking,
+>>>>>>> 3a58390 (Initial commit)
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../lib/supabase';
@@ -273,7 +277,11 @@ export default function AuthScreen({ initialMode, onBack }: AuthScreenProps) {
             </TouchableOpacity>
 
             <Text style={styles.disclaimer}>
+<<<<<<< HEAD
               By continuing, you agree to our Terms & Privacy Policy.{'\n'}
+=======
+              By continuing, you agree to our <Text style={{textDecorationLine: 'underline'}} onPress={() => Linking.openURL('https://takam.app/terms')}>Terms</Text> & <Text style={{textDecorationLine: 'underline'}} onPress={() => Linking.openURL('https://takam.app/privacy')}>Privacy Policy</Text>.{'\n'}
+>>>>>>> 3a58390 (Initial commit)
               Your bond is private and encrypted.
             </Text>
           </View>

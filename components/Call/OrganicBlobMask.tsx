@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { StyleSheet, View } from 'react-native';
 import { 
   Canvas, 
@@ -23,11 +24,61 @@ export const OrganicBlobMask: React.FC<OrganicBlobMaskProps> = ({ children, widt
   useEffect(() => {
     clock.value = withRepeat(
       withTiming(1, { duration: 15000, easing: Easing.bezier(0.42, 0, 0.58, 1) }),
+=======
+import React, { useEffect } from 'react';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  Canvas,
+  Group,
+  Mask,
+  Rect,
+  Blur,
+  Circle,
+  Path,
+  Skia,
+  LinearGradient,
+  vec,
+} from '@shopify/react-native-skia';
+import Animated, {
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+  useDerivedValue,
+} from 'react-native-reanimated';
+
+/**
+ * OrganicBlobMask
+ * Creates a shimmering, living mask for the video call experience.
+ * Uses HSL-tailored colors and smooth Skia blurs.
+ */
+export const OrganicBlobMask = ({ 
+  children, 
+  color = '#C9705A',
+  width: propWidth,
+  height: propHeight
+}: { 
+  children: React.ReactNode, 
+  color?: string,
+  width?: number,
+  height?: number
+}) => {
+  const { width: winWidth, height: winHeight } = useWindowDimensions();
+  const width = propWidth ?? winWidth;
+  const height = propHeight ?? winHeight;
+  
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 4000, easing: Easing.inOut(Easing.sin) }),
+>>>>>>> 3a58390 (Initial commit)
       -1,
       true
     );
   }, []);
 
+<<<<<<< HEAD
   // ── Undulating Blob Path Logic (Luxury Smoothness) ────────────────────────
   const blobPath = useDerivedValue(() => {
     const t = clock.value * 2 * Math.PI;
@@ -101,3 +152,67 @@ export const OrganicBlobMask: React.FC<OrganicBlobMaskProps> = ({ children, widt
     </View>
   );
 };
+=======
+  const blobRadius = useDerivedValue(() => {
+    return (width * 0.4) + (pulse.value * 20);
+  });
+
+  const blurAmount = useDerivedValue(() => {
+    return 15 + (pulse.value * 10);
+  });
+
+  return (
+    <View style={[styles.container, propWidth ? { width: propWidth, height: propHeight, flex: 0 } : null]}>
+      <Canvas style={styles.canvas}>
+        <Mask
+          mode="luminance"
+          mask={
+            <Group>
+              <Circle cx={width / 2} cy={height / 2} r={blobRadius} color="white">
+                <Blur blur={blurAmount} />
+              </Circle>
+            </Group>
+          }
+        >
+          {/* The masked area - we'll use a placeholder gradient for now */}
+          <Rect x={0} y={0} width={width} height={height}>
+            <LinearGradient
+              start={vec(0, 0)}
+              end={vec(width, height)}
+              colors={['#1A1513', color, '#1A1513']}
+            />
+          </Rect>
+        </Mask>
+      </Canvas>
+      
+      {/* Absolute overlay for the actual video content which will be clipped by the parent */}
+      <View style={[styles.videoContainer, { 
+        width: width * 0.85, 
+        height: width * 0.85, 
+        borderRadius: width * 0.4,
+        top: (height / 2) - (width * 0.425),
+        left: (width / 2) - (width * 0.425),
+      }]}>
+        {children}
+      </View>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1A1513',
+  },
+  canvas: {
+    flex: 1,
+  },
+  videoContainer: {
+    position: 'absolute',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  }
+});
+>>>>>>> 3a58390 (Initial commit)

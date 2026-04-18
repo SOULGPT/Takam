@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { useEffect, useRef, useCallback } from 'react';
 import {
   RTCPeerConnection,
@@ -155,3 +156,6 @@ export function useWebRTC() {
 
   return { endCall };
 }
+=======
+export * from './useWebRTC';
+>>>>>>> 3a58390 (Initial commit)

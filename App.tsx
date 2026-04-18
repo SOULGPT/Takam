@@ -249,6 +249,51 @@ function AppCore() {
     };
   }, [bonds.map((b) => b.id).join(','), session?.user?.id]);
 
+  // ── Real-time watcher: Global Notifications (Unread Badges) ─────────────
+  useEffect(() => {
+    if (!session?.user?.id || !bonds.length) return;
+
+    const activeBondIds = bonds.filter(b => b.status === 'active').map(b => b.id);
+    if (!activeBondIds.length) return;
+
+    const channel = supabase.channel('global_notifications');
+
+    // Watch for new messages across all active bonds
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'messages'
+    }, (payload: any) => {
+      const msg = payload.new;
+      if (msg.sender_id !== session.user.id && activeBondIds.includes(msg.bond_id)) {
+        // Increment count if we aren't currently looking at this chat
+        if (useStore.getState().activeBondId !== msg.bond_id) {
+          useStore.getState().incrementUnread(msg.bond_id);
+        }
+      }
+    });
+
+    // Watch for new vibes across all active bonds
+    channel.on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'vibes'
+    }, (payload: any) => {
+      const vibe = payload.new;
+      if (vibe.sender_id !== session.user.id && activeBondIds.includes(vibe.bond_id)) {
+        if (useStore.getState().activeBondId !== vibe.bond_id) {
+          useStore.getState().incrementUnread(vibe.bond_id);
+        }
+      }
+    });
+
+    channel.subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id, bonds.length]);
+
   // ── Global Real-time Watcher for Unread Counts ───────────────────────────
   useEffect(() => {
     if (!session?.user?.id) return;

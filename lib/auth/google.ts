@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from '../supabase';
 
@@ -6,9 +7,28 @@ import { supabase } from '../supabase';
 if (Platform.OS !== 'web') {
   GoogleSignin.configure({
     webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    iosClientId: 'com.googleusercontent.apps.631733089392-uq1nau14bjmftq0d08021r5c4u0d92mq', // <--- REPLACE THIS 
+    // REPLACE WITH: [Your-ID].apps.googleusercontent.com from GoogleService-Info.plist
+    iosClientId: '631733089392-uq1nau14bjmftq0d08021r5c4u0d92mq.apps.googleusercontent.com', 
     scopes: ['profile', 'email'],
   });
+}
+
+// Helper: Generate a random string
+function generateNonce(length = 32) {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
+// Helper: Simple SHA-256 for nonce hashing
+async function sha256(message: string) {
+  return await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    message
+  );
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -28,7 +48,15 @@ export async function signInWithGoogle(): Promise<void> {
 
   // Native (Android / iOS): use native Google Sign-In SDK
   await GoogleSignin.hasPlayServices();
-  const userInfo = await GoogleSignin.signIn();
+  
+  const rawNonce = generateNonce();
+  const hashedNonce = await sha256(rawNonce);
+
+  const userInfo = await GoogleSignin.signIn({
+    // @ts-ignore
+    nonce: hashedNonce,
+  });
+  
   const idToken = userInfo.data?.idToken;
 
   if (!idToken) throw new Error('Google Sign-In failed: no ID token.');
@@ -36,6 +64,7 @@ export async function signInWithGoogle(): Promise<void> {
   const { error } = await supabase.auth.signInWithIdToken({
     provider: 'google',
     token: idToken,
+    nonce: rawNonce,
   });
 
   if (error) throw error;

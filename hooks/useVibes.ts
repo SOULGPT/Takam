@@ -30,6 +30,12 @@ const HAPTIC_PATTERNS: Record<string, () => Promise<void>> = {
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
+<<<<<<< HEAD
+=======
+let lastVibeSentAt = 0;
+const VIBE_COOLDOWN = 1500; // 1.5 second cooldown to prevent bot spam
+
+>>>>>>> 3a58390 (Initial commit)
 export function useVibes(onVibeReceived?: (vibe: any) => void) {
   const activeBondId = useStore((s) => s.activeBondId);
   const session = useStore((s) => s.session);
@@ -77,11 +83,24 @@ export function useVibes(onVibeReceived?: (vibe: any) => void) {
 }
 
 export async function sendVibe(bondId: string, vibeType: string, content?: string): Promise<void> {
+<<<<<<< HEAD
+=======
+  const now = Date.now();
+  if (now - lastVibeSentAt < VIBE_COOLDOWN) {
+    throw new Error('Calm your spirit. The Sanctuary requires a moment between vibes.');
+  }
+
+>>>>>>> 3a58390 (Initial commit)
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
 
+<<<<<<< HEAD
+=======
+  lastVibeSentAt = now;
+
+>>>>>>> 3a58390 (Initial commit)
   const { error } = await supabase.from('vibes').insert({
     bond_id: bondId,
     sender_id: user.id,

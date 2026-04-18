@@ -218,6 +218,23 @@ export default function HomeScreen() {
       }
       return;
     }
+<<<<<<< HEAD
+=======
+
+  // 4. Cleanup Walkie Talkie on Unmount
+  useEffect(() => {
+    return () => {
+      if (recorder.isRecording) {
+        recorder.stop().catch(() => {});
+        AudioModule.setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        }).catch(() => {});
+      }
+    };
+  }, [recorder.isRecording]);
+
+>>>>>>> 3a58390 (Initial commit)
     setVibeQueue(q => [...q, vibe]);
   }, []);
 
@@ -305,6 +322,7 @@ export default function HomeScreen() {
 
   const handleStartTalk = async () => {
     try {
+<<<<<<< HEAD
       const { status } = await requestRecordingPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission Denied', 'Mic access is needed for Walkie-Talkie');
@@ -314,18 +332,46 @@ export default function HomeScreen() {
       await AudioModule.setAudioModeAsync({
         allowsRecording: true,
         playsInSilentMode: true,
+=======
+      const { status, canAskAgain } = await requestRecordingPermissionsAsync();
+      
+      if (status !== 'granted') {
+        if (canAskAgain) {
+          const retry = await requestRecordingPermissionsAsync();
+          if (retry.status !== 'granted') {
+            Alert.alert('Permission Needed', 'Please enable Microphone access in your iPhone Settings to use Walkie-Talkie.');
+            return;
+          }
+        } else {
+          Alert.alert('Permission Denied', 'Microphone access is disabled. Please enable it in Settings > TAKAM.');
+          return;
+        }
+      }
+      
+      // Configure audio session for recording
+      await AudioModule.setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        interruptionMode: 'doNotMix',
+        shouldRouteThroughEarpiece: false,
+>>>>>>> 3a58390 (Initial commit)
       });
 
       await recorder.prepareToRecordAsync();
       recorder.record();
     } catch (e) {
       console.error('Failed to start recording', e);
+<<<<<<< HEAD
       Alert.alert('Error', 'Failed to start recording');
+=======
+      // Don't alert here as it might be a transient error, just log it
+>>>>>>> 3a58390 (Initial commit)
     }
   };
 
   const handleStopTalk = async () => {
     try {
+<<<<<<< HEAD
       await recorder.stop();
       const uri = recorder.uri;
       if (!uri) return;
@@ -333,6 +379,25 @@ export default function HomeScreen() {
       const audioUrl = await uploadVibeFile(uri);
       if (audioUrl) {
         await sendVibe(activeBondId!, 'walkie_burst', audioUrl);
+=======
+      // Only stop if we were actually recording to avoid "stop function failed" error
+      if (recorder.isRecording) {
+        await recorder.stop();
+        
+        // Reset audio mode to playback only
+        await AudioModule.setAudioModeAsync({
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
+
+        const uri = recorder.uri;
+        if (!uri) return;
+
+        const audioUrl = await uploadVibeFile(uri);
+        if (audioUrl) {
+          await sendVibe(activeBondId!, 'walkie_burst', audioUrl);
+        }
+>>>>>>> 3a58390 (Initial commit)
       }
     } catch (e) {
       console.error('Failed to send Walkie Burst', e);

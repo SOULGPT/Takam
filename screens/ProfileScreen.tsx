@@ -97,7 +97,11 @@ export default function ProfileScreen() {
              setLoading(true);
              try {
                 // Total Wipe Ritual
+<<<<<<< HEAD
                 const { error: profileError } = await supabase.from('profiles').delete().eq('id', profile?.id);
+=======
+                const { error: profileError } = await supabase.rpc('delete_account');
+>>>>>>> 3a58390 (Initial commit)
                 if (profileError) throw profileError;
                 
                 await supabase.auth.signOut();

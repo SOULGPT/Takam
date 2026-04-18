@@ -4,6 +4,10 @@ import Animated, { FadeIn, FadeOut, ZoomIn, ZoomOut } from 'react-native-reanima
 import * as Haptics from 'expo-haptics';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+<<<<<<< HEAD
+=======
+import { shadow } from '../lib/theme/shadows';
+>>>>>>> 3a58390 (Initial commit)
 
 interface DissolveModalProps {
   visible: boolean;
@@ -92,11 +96,15 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     overflow: 'hidden',
     backgroundColor: '#FAF3EA',
+<<<<<<< HEAD
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.3,
     shadowRadius: 20,
+=======
+    ...shadow('#000', { width: 0, height: 10 }, 0.3, 20, 10),
+>>>>>>> 3a58390 (Initial commit)
   },
   card: {
     padding: 32,

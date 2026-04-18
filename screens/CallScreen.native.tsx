@@ -1,9 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, Platform, Animated as RNAnimated, Alert } from 'react-native';
+<<<<<<< HEAD
 import { RTCView } from 'react-native-webrtc';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useCallStore } from '../store/useCallStore';
 import { useWebRTC } from '../hooks/useWebRTC';
+=======
+import { RTCView } from '../lib/webrtc';
+import { Ionicons, Feather } from '@expo/vector-icons';
+import { useCallStore } from '../store/useCallStore';
+import { useWebRTC } from '../hooks/useWebRTC';
+import { shadow } from '../lib/theme/shadows';
+>>>>>>> 3a58390 (Initial commit)
 import { OrganicBlobMask } from '../components/Call/OrganicBlobMask';
 import { AuraAnimation } from '../components/Call/AuraAnimation';
 import { ParchmentGrain } from '../components/Call/ParchmentGrain';
@@ -168,6 +176,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 140,
     right: 30,
+<<<<<<< HEAD
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -177,6 +186,9 @@ const styles = StyleSheet.create({
       },
       android: { elevation: 10 }
     })
+=======
+    ...shadow('#000', { width: 0, height: 10 }, 0.3, 20, 10),
+>>>>>>> 3a58390 (Initial commit)
   },
   fullVideo: { width: '100%', height: '100%' },
   initiationContainer: { alignItems: 'center' },
@@ -230,10 +242,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#C47A52',
     justifyContent: 'center',
     alignItems: 'center',
+<<<<<<< HEAD
     shadowColor: '#C47A52',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 10,
+=======
+    ...shadow('#C47A52', { width: 0, height: 4 }, 0.4, 10, 4),
+>>>>>>> 3a58390 (Initial commit)
   },
   endLabel: {
     color: '#D9BC8A',

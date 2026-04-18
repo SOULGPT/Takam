@@ -342,6 +342,8 @@ export default function ChatScreen() {
   const slideX = useRef(new RNAnimated.Value(0)).current;
   const slideY = useRef(new RNAnimated.Value(0)).current;
   const lockAnim = useRef(new RNAnimated.Value(0)).current;
+  const lastMessageSentAt = useRef(0);
+  const CHAT_COOLDOWN = 800; // 0.8 seconds between messages
 
   // Cleanup preview player
   useEffect(() => {
@@ -376,7 +378,21 @@ export default function ChatScreen() {
         { text: 'Cancel', style: 'cancel' },
         { 
           text: 'Inappropriate Content', 
-          onPress: () => Alert.alert('Reported', 'Your report has been logged. Peace be with you.') 
+          onPress: async () => {
+            if (!session?.user || !partnerProfile) return;
+            try {
+              await supabase.from('reports').insert({
+                reporter_id: session.user.id,
+                reported_id: partnerProfile.id,
+                bond_id: activeBondId,
+                reason: 'Inappropriate Content reported via ChatScreen',
+              });
+              Alert.alert('Reported', 'Your report has been logged. Peace be with you.');
+            } catch (e) {
+              console.error('Report failed', e);
+              Alert.alert('Error', 'Failed to submit report. Please try again later.');
+            }
+          } 
         },
         { 
           // Apple Guideline 1.2 requires a block option for social apps
@@ -782,6 +798,12 @@ export default function ChatScreen() {
     if (!finalMediaUrl && !txt) return;
     if (!session?.user || !activeBondId || sending) return;
 
+    // Rate limit check
+    const nowTs = Date.now();
+    if (nowTs - lastMessageSentAt.current < CHAT_COOLDOWN) {
+      return; // Silent ignore to prevent UI jitter, but stops the spam
+    }
+    lastMessageSentAt.current = nowTs;
     setSending(true);
     if (!finalMediaUrl) setInputText('');
     playSound('send');
@@ -1318,11 +1340,7 @@ const styles = StyleSheet.create({
   bubble: {
     paddingHorizontal: 16,
     paddingVertical: 11,
-    ...Platform.select({
-      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
-      android: { elevation: 2 },
-      web: { boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }
-    })
+    ...shadow('#000', { width: 0, height: 2 }, 0.1, 4, 2),
   },
   bubbleMe: {
   },

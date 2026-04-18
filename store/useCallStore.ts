@@ -1,5 +1,9 @@
 import { create } from 'zustand';
+<<<<<<< HEAD
 import { MediaStream } from 'react-native-webrtc';
+=======
+import { MediaStream } from '../lib/webrtc';
+>>>>>>> 3a58390 (Initial commit)
 import { Profile } from './useStore';
 
 export type CallStatus = 'idle' | 'calling' | 'ringing' | 'connected' | 'ended';

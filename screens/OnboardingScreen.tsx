@@ -12,6 +12,10 @@ import {
   ActivityIndicator,
   StatusBar,
   Animated,
+<<<<<<< HEAD
+=======
+  Linking,
+>>>>>>> 3a58390 (Initial commit)
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { shadow } from '../lib/theme/shadows';
@@ -354,8 +358,13 @@ export default function OnboardingScreen({ onComplete }: Props) {
         </View>
         <Text style={styles.checkLabel}>
           I agree to the{' '}
+<<<<<<< HEAD
           <Text style={styles.checkLink}>Terms of Service</Text> and{' '}
           <Text style={styles.checkLink}>Privacy Policy</Text>
+=======
+          <Text style={styles.checkLink} onPress={() => Linking.openURL('https://takam.app/terms')}>Terms of Service</Text> and{' '}
+          <Text style={styles.checkLink} onPress={() => Linking.openURL('https://takam.app/privacy')}>Privacy Policy</Text>
+>>>>>>> 3a58390 (Initial commit)
         </Text>
       </TouchableOpacity>
     </>
