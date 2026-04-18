@@ -18,6 +18,7 @@
       "googleServicesFile": "./GoogleService-Info.plist",
       "privacyPolicyUrl": "https://takam.app/privacy",
       "usesAppleSignIn": true,
+      "minimumOsVersion": "16.0",
       "config": {
         "googleMapsApiKey": "AIzaSyDoPkSEa083VGDOF8E2Woq02AuzIC2pr8Q"
       },
