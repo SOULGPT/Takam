@@ -12,7 +12,7 @@
 ## ✨ The Ritual of Experience
 
 ### 🌊 The Sanctuary (Call System)
-Escape traditional video calls. Experience the **Organic Blob Mask** and **Animated Aura** system, where your partner's presence is framed within a living, shimmering vessel. Powered by **React Native Skia** and **WebRTC**.
+Escape traditional video calls. Experience the **Organic Blob Mask** and **Animated Aura** system, where your partner's presence is framed within a living, shimmering vessel. Powered by **React Native Skia** and the robust real-time infrastructure of **LiveKit**.
 
 ### 💓 Heartbeat Pulse
 Feel the resonance. A 60bpm generative heartbeat pulse synchronized with **Expo Haptics** creates a physical connection even when miles apart.
@@ -32,6 +32,7 @@ Built with absolute privacy. Implementations for **UGC Reporting** and the **"Di
 | **Foundation** | React Native (Expo SDK 54) | Cross-platform performance & native fidelity. |
 | **Experience** | @shopify/react-native-skia | High-performance GLSL-grade shaders & animations. |
 | **Logic** | Supabase & Postgres | Real-time RLS-protected database & Auth. |
+| **Connectivity**| LiveKit | Ultra-low latency voice & video synchronization. |
 | **Audio** | Expo AV | High-fidelity generative sound & rhythms. |
 | **Hardware** | NFC Manager | Tap-to-Bond physical handshake ritual. |
 
@@ -61,8 +62,10 @@ npx eas build --platform ios --profile production
 
 ## 🏛️ Ownership & Credits
 
-**Architected & Conceived by Farooq AK**
+**Founder of this project is Eiden/Farooq**
 
-This project is the result of a quest for a more human digital connection. It is licensed under the **MIT License**, dedicated to the lovers and the dreamers.
+Copyright © 2026 Eiden/Farooq. All Rights Reserved.
+
+This project is the result of a quest for a more human digital connection, meticulously designed to be the definitive digital sanctuary.
 
 > *"TAKAM — Protecting your bond."* 🏘️✨❤️
