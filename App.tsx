@@ -22,15 +22,15 @@ import AdminNavigator from './navigation/AdminNavigator';
 import UpgradeScreen from './screens/UpgradeScreen';
 import { signInWithGoogle } from './lib/auth/google';
 import { signInWithApple } from './lib/auth/apple';
-import { 
-  useFonts, 
-  CormorantGaramond_400Regular, 
+import {
+  useFonts,
+  CormorantGaramond_400Regular,
   CormorantGaramond_400Regular_Italic,
-  CormorantGaramond_700Bold 
+  CormorantGaramond_700Bold
 } from '@expo-google-fonts/cormorant-garamond';
-import { 
-  Caveat_400Regular, 
-  Caveat_700Bold 
+import {
+  Caveat_400Regular,
+  Caveat_700Bold
 } from '@expo-google-fonts/caveat';
 
 const RootStack = createNativeStackNavigator();
@@ -74,9 +74,9 @@ function AppCore() {
       const state = useStore.getState();
       if (!state.session?.user?.id) return;
       if (nextAppState === 'active') {
-         await supabase.from('profiles').update({ is_online: true, last_active_at: new Date().toISOString() }).eq('id', state.session.user.id);
+        await supabase.from('profiles').update({ is_online: true, last_active_at: new Date().toISOString() }).eq('id', state.session.user.id);
       } else if (nextAppState === 'background' || nextAppState === 'inactive') {
-         await supabase.from('profiles').update({ is_online: false }).eq('id', state.session.user.id);
+        await supabase.from('profiles').update({ is_online: false }).eq('id', state.session.user.id);
       }
     });
     return () => subscription.remove();
@@ -117,11 +117,11 @@ function AppCore() {
 
         if (profileData) {
           let prof = profileData as Profile;
-          
+
           // Forcefully broadcast online presence immediately on boot
           if (!prof.is_online) {
-             await supabase.from('profiles').update({ is_online: true, last_active_at: new Date().toISOString() }).eq('id', prof.id);
-             prof.is_online = true;
+            await supabase.from('profiles').update({ is_online: true, last_active_at: new Date().toISOString() }).eq('id', prof.id);
+            prof.is_online = true;
           }
 
           // Automated Downgrade Check
@@ -167,7 +167,7 @@ function AppCore() {
           .select('*, group_members!inner(user_id)')
           .eq('group_members.user_id', session.user.id)
           .eq('group_members.status', 'active');
-        
+
         if (groupData) {
           setGroups(groupData as Group[]);
         }
@@ -189,7 +189,7 @@ function AppCore() {
             .from('user_chat_preferences')
             .select('bond_id, theme_key')
             .eq('user_id', session.user.id);
-          
+
           if (themeData) {
             themeData.forEach(row => {
               useStore.getState().setUserBondTheme(row.bond_id, row.theme_key);
@@ -202,7 +202,7 @@ function AppCore() {
         // 5. Default active bond → first active one
         const firstActive = allBonds.find((b) => b.status === 'active');
         if (firstActive) setActiveBondId(firstActive.id);
-      } catch (_) {}
+      } catch (_) { }
     })();
   }, [session?.user?.id]);
 
@@ -344,11 +344,11 @@ function AppCore() {
           const state = useStore.getState();
           // Only increment if we are not currently in that group chat
           if (payload.new.sender_id !== session.user.id && state.activeGroupId !== payload.new.group_id) {
-             const currentUnread = state.groupUnreadCounts[payload.new.group_id] || 0;
-             state.setGroupUnreadCounts({
-               ...state.groupUnreadCounts,
-               [payload.new.group_id]: currentUnread + 1
-             });
+            const currentUnread = state.groupUnreadCounts[payload.new.group_id] || 0;
+            state.setGroupUnreadCounts({
+              ...state.groupUnreadCounts,
+              [payload.new.group_id]: currentUnread + 1
+            });
           }
         }
       )
@@ -375,14 +375,14 @@ function AppCore() {
       .on('broadcast', { event: 'OFFER' }, async (payload: any) => {
         const state = useStore.getState();
         const callState = useCallStore.getState();
-        
+
         // If we are already in a call, ignore
         if (callState.status !== 'idle') return;
 
         // Find the caller from existing bond partners
         const callerBond = state.bonds.find(b => b.id === payload.activeBondId || b.id === payload.bondId);
         if (!callerBond) return;
-        
+
         const myId = session.user.id;
         const partnerId = callerBond.user_a === myId ? callerBond.user_b : callerBond.user_a;
         const partnerProfile = state.bondMembers[callerBond.id];
@@ -512,13 +512,13 @@ export default function App() {
 
 const styles = StyleSheet.create({
   webRoot: { flex: 1, backgroundColor: '#1A1513' },
-  webContainer: { 
-    flex: 1, 
-    width: '100%', 
+  webContainer: {
+    flex: 1,
+    width: '100%',
     maxWidth: 500, // Universally caps stretching on iPads, Android Tablets, and Web simultaneously
-    marginHorizontal: 'auto', 
-    backgroundColor: '#F5ECD7', 
-    overflow: 'hidden' 
+    marginHorizontal: 'auto',
+    backgroundColor: '#F5ECD7',
+    overflow: 'hidden'
   },
   loader: {
     flex: 1,

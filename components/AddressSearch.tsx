@@ -16,11 +16,7 @@ export default function AddressSearch({ onAddressSelect, placeholder = "Search f
           onAddressSelect(data.description);
         }}
         query={{
-<<<<<<< HEAD
-          key: 'YOUR_GOOGLE_PLACES_API_KEY', // Recommended to move to env
-=======
           key: process.env.EXPO_PUBLIC_GOOGLE_PLACES_KEY,
->>>>>>> 3a58390 (Initial commit)
           language: 'en',
         }}
         styles={{

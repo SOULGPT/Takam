@@ -11,12 +11,12 @@ interface WalkieTalkieViewProps {
   status?: string;
 }
 
-export default function WalkieTalkieView({ 
-  partnerName, 
-  onStartTalk, 
-  onStopTalk, 
+export default function WalkieTalkieView({
+  partnerName,
+  onStartTalk,
+  onStopTalk,
   onBack,
-  status = 'Frequency Linked' 
+  status = 'Frequency Linked'
 }: WalkieTalkieViewProps) {
   const [isTalking, setIsTalking] = useState(false);
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -66,10 +66,10 @@ export default function WalkieTalkieView({
         {/* The Big Button */}
         <View style={styles.micContainer}>
           <Animated.View style={[
-            styles.pulseAura, 
+            styles.pulseAura,
             { transform: [{ scale: pulseAnim }], opacity: isTalking ? 0.4 : 0 }
           ]} />
-          
+
           <TouchableOpacity
             style={styles.micBtn}
             activeOpacity={0.9}
@@ -92,32 +92,32 @@ export default function WalkieTalkieView({
 
         {/* Sliders Mockup */}
         <View style={styles.controls}>
-           <View style={styles.sliderGroup}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>SENSITIVITY</Text>
-                <Text style={styles.sliderValue}>75%</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: '75%', backgroundColor: '#C9705A' }]} />
-              </View>
-           </View>
-           
-           <View style={styles.sliderGroup}>
-              <View style={styles.sliderHeader}>
-                <Text style={styles.sliderLabel}>VOLUME</Text>
-                <Text style={styles.sliderValue}>HIGH</Text>
-              </View>
-              <View style={styles.track}>
-                <View style={[styles.fill, { width: '90%', backgroundColor: '#44674D' }]} />
-              </View>
-           </View>
+          <View style={styles.sliderGroup}>
+            <View style={styles.sliderHeader}>
+              <Text style={styles.sliderLabel}>SENSITIVITY</Text>
+              <Text style={styles.sliderValue}>75%</Text>
+            </View>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: '75%', backgroundColor: '#C9705A' }]} />
+            </View>
+          </View>
 
-           <View style={styles.toggleRow}>
-              <Text style={styles.toggleText}>Continuous Mode</Text>
-              <View style={styles.toggleSwitch}>
-                <View style={styles.toggleKnob} />
-              </View>
-           </View>
+          <View style={styles.sliderGroup}>
+            <View style={styles.sliderHeader}>
+              <Text style={styles.sliderLabel}>VOLUME</Text>
+              <Text style={styles.sliderValue}>HIGH</Text>
+            </View>
+            <View style={styles.track}>
+              <View style={[styles.fill, { width: '90%', backgroundColor: '#44674D' }]} />
+            </View>
+          </View>
+
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleText}>Continuous Mode</Text>
+            <View style={styles.toggleSwitch}>
+              <View style={styles.toggleKnob} />
+            </View>
+          </View>
         </View>
       </View>
     </View>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   sliderValue: { fontSize: 10, fontWeight: '800', color: '#C9705A' },
   track: { width: '100%', height: 6, backgroundColor: '#EDD9B8', borderRadius: 3, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3 },
-  
+
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

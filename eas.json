@@ -37,6 +37,9 @@
         "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "",
         "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": "",
         "EXPO_PUBLIC_GOOGLE_PLACES_KEY": ""
+      },
+      "ios": {
+        "image": "macos-sequoia-15.4-xcode-16.3"
       }
     }
   },
@@ -44,7 +47,7 @@
     "production": {
       "ios": {
         "appleId": "efak621@gmail.com",
-        "ascAppId": "6762131865",
+        "ascAppId": "6762522491",
         "appleTeamId": "9R3XT3N4YF"
       }
     }

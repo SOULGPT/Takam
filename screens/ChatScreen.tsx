@@ -20,20 +20,20 @@ import * as Haptics from 'expo-haptics';
 import { Swipeable, PanGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  createAudioPlayer, 
-  useAudioRecorder, 
-  useAudioRecorderState, 
-  RecordingPresets, 
-  requestRecordingPermissionsAsync 
+import {
+  createAudioPlayer,
+  useAudioRecorder,
+  useAudioRecorderState,
+  RecordingPresets,
+  requestRecordingPermissionsAsync
 } from 'expo-audio';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withRepeat, 
-  withSequence, 
-  withTiming, 
-  interpolateColor 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+  interpolateColor
 } from 'react-native-reanimated';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -69,15 +69,15 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
   const [player] = useState(() => createAudioPlayer(uri));
   const [pos, setPos] = useState(0);
   const [duration, setDuration] = useState(1);
-  
+
   const pulse = useSharedValue(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
       if (player) {
-         setPos(player.currentTime * 1000);
-         setDuration(player.duration * 1000);
-         setPlaying(player.playing);
+        setPos(player.currentTime * 1000);
+        setDuration(player.duration * 1000);
+        setPlaying(player.playing);
       }
     }, 100);
     return () => {
@@ -128,14 +128,14 @@ const AudioBubble = ({ uri, isMe, theme }: { uri: string, isMe: boolean, theme: 
 
   return (
     <Animated.View style={[
-      styles.audioBubbleContainer, 
+      styles.audioBubbleContainer,
       { backgroundColor: '#262729', borderRadius: 12, borderWidth: 1, shadowColor: '#C0624A' },
       animatedGlow
     ]}>
       <TouchableOpacity onPress={togglePlayback} style={{ padding: 4 }}>
         <Ionicons name={playing ? 'pause' : 'play'} size={20} color={playing ? '#C0624A' : "#D2D3D5"} />
       </TouchableOpacity>
-      
+
       <View style={styles.audioMeta}>
         <View style={styles.track}>
           <View style={[styles.progress, { width: `${progress}%`, backgroundColor: playing ? '#C0624A' : '#FFF' }]} />
@@ -180,7 +180,7 @@ const ChatBubble = React.memo(({
   if (item.is_system) {
     const isMilestone = item.content.toLowerCase().includes('milestone');
     const isSyncLink = item.content.includes('[SYNC-LINK]');
-    
+
     if (isMilestone) {
       return (
         <View style={styles.milestoneContainer}>
@@ -192,7 +192,7 @@ const ChatBubble = React.memo(({
         </View>
       );
     }
-    
+
     if (isSyncLink) {
       return (
         <View style={styles.systemBubbleWrap}>
@@ -263,11 +263,11 @@ const ChatBubble = React.memo(({
           <View style={{ width: 28, marginRight: 8, justifyContent: 'flex-end', paddingBottom: parentMsg ? 4 : 0 }}>
             {showAvatar && (
               partnerAvatarKey && AVATARS[partnerAvatarKey] ? (
-                 <Image source={AVATARS[partnerAvatarKey]} style={{ width: 28, height: 28, borderRadius: 14 }} />
+                <Image source={AVATARS[partnerAvatarKey]} style={{ width: 28, height: 28, borderRadius: 14 }} />
               ) : (
-                 <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: th.myBubbleColor, justifyContent: 'center', alignItems: 'center' }}>
-                   <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>{partnerName.charAt(0)}</Text>
-                 </View>
+                <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: th.myBubbleColor, justifyContent: 'center', alignItems: 'center' }}>
+                  <Text style={{ color: '#FFF', fontSize: 12, fontWeight: 'bold' }}>{partnerName.charAt(0)}</Text>
+                </View>
               )
             )}
           </View>
@@ -308,9 +308,9 @@ const ChatBubble = React.memo(({
       </View>
     </Swipeable>
   );
-}, (prev, next) => 
-  prev.item.id === next.item.id && 
-  prev.item.is_pinned === next.item.is_pinned && 
+}, (prev, next) =>
+  prev.item.id === next.item.id &&
+  prev.item.is_pinned === next.item.is_pinned &&
   prev.theme.name === next.theme.name &&
   prev.isClusteredTop === next.isClusteredTop &&
   prev.isClusteredBottom === next.isClusteredBottom
@@ -347,7 +347,7 @@ export default function ChatScreen() {
 
   // Cleanup preview player
   useEffect(() => {
-    return () => { 
+    return () => {
       if (previewPlayer) {
         previewPlayer.pause();
         previewPlayer.remove();
@@ -376,8 +376,8 @@ export default function ChatScreen() {
       'Choose the nature of your report. Our stewards will review the resonance of this interaction within 24 hours.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Inappropriate Content', 
+        {
+          text: 'Inappropriate Content',
           onPress: async () => {
             if (!session?.user || !partnerProfile) return;
             try {
@@ -392,13 +392,13 @@ export default function ChatScreen() {
               console.error('Report failed', e);
               Alert.alert('Error', 'Failed to submit report. Please try again later.');
             }
-          } 
+          }
         },
-        { 
+        {
           // Apple Guideline 1.2 requires a block option for social apps
-          text: 'Block User', 
+          text: 'Block User',
           style: 'destructive',
-          onPress: () => Alert.alert('Action Required', 'Please dissolve the bond in your profile settings to permanently block this user.') 
+          onPress: () => Alert.alert('Action Required', 'Please dissolve the bond in your profile settings to permanently block this user.')
         }
       ]
     );
@@ -540,7 +540,7 @@ export default function ChatScreen() {
         .is('read_at', null)
         .neq('sender_id', session.user.id)
         .then();
-        
+
       useStore.getState().clearUnread(activeBondId);
     };
 
@@ -677,7 +677,7 @@ export default function ChatScreen() {
 
       await recorder.prepareToRecordAsync();
       recorder.record();
-      
+
       recordInterval.current = setInterval(() => {
         setRecordDuration((d: number) => d + 1);
       }, 1000);
@@ -693,7 +693,7 @@ export default function ChatScreen() {
     try {
       await recorder.stop();
       const uri = recorder.uri;
-      
+
       setIsRecording(false);
       setIsRecordingLocked(false);
       if (recordInterval.current) clearInterval(recordInterval.current);
@@ -721,11 +721,11 @@ export default function ChatScreen() {
 
   const handlePreviewPlay = () => {
     if (!recordingPreviewUri) return;
-    
+
     let activePlayer = previewPlayer;
     if (!activePlayer) {
       activePlayer = createAudioPlayer(recordingPreviewUri);
-      
+
       // Add status listener for cleanup and UI sync
       activePlayer.addListener('playbackStatusUpdate', (status: any) => {
         if (status.didJustFinish) {
@@ -878,10 +878,10 @@ export default function ChatScreen() {
 
     const isMe = item.sender_id === session?.user?.id;
     const parentMsg = item.reply_to_id ? messages.find(m => m.id === item.reply_to_id) : null;
-    
+
     // Clustering detection for bubbles of the same sender
-    const isClusteredTop = index < displayItems.length - 1 && displayItems[index+1].sender_id === item.sender_id;
-    const isClusteredBottom = index > 0 && displayItems[index-1].sender_id === item.sender_id;
+    const isClusteredTop = index < displayItems.length - 1 && displayItems[index + 1].sender_id === item.sender_id;
+    const isClusteredBottom = index > 0 && displayItems[index - 1].sender_id === item.sender_id;
 
     return (
       <ChatBubble
@@ -910,7 +910,7 @@ export default function ChatScreen() {
 
     if (isToday) return 'Today';
     if (isYesterday) return 'Yesterday';
-    
+
     // DD/MM/YYYY
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -922,11 +922,11 @@ export default function ChatScreen() {
   messages.forEach((m, i) => {
     // Expiry check
     if (m.expires_at && new Date(m.expires_at) < now) return;
-    
+
     displayItems.push(m);
     const currentDay = new Date(m.created_at).toDateString();
-    const prevDay = i < messages.length - 1 ? new Date(messages[i+1].created_at).toDateString() : null;
-    
+    const prevDay = i < messages.length - 1 ? new Date(messages[i + 1].created_at).toDateString() : null;
+
     if (currentDay !== prevDay) {
       displayItems.push({
         id: `date-${m.id}`,
@@ -945,11 +945,11 @@ export default function ChatScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <LinearGradient colors={th.bgColors} style={StyleSheet.absoluteFill} />
-        
+
         {th.bgImage && (
-          <ImageBackground 
-            source={th.bgImage} 
-            style={StyleSheet.absoluteFill} 
+          <ImageBackground
+            source={th.bgImage}
+            style={StyleSheet.absoluteFill}
             resizeMode="cover"
           >
             {th.overlayOpacity && (
@@ -959,17 +959,17 @@ export default function ChatScreen() {
         )}
 
         {activeBondKey === 'classic' && !th.bgImage && (
-          <ImageBackground 
-            source={chatPattern} 
-            style={StyleSheet.absoluteFill} 
+          <ImageBackground
+            source={chatPattern}
+            style={StyleSheet.absoluteFill}
             tintColor="#000"
-            imageStyle={{ opacity: 0.03 }} 
+            imageStyle={{ opacity: 0.03 }}
           />
         )}
 
         {/* ── Ref 4 Ultra-Clean Header ── */}
-        <BlurView 
-          intensity={Platform.OS === 'ios' ? 80 : 100} 
+        <BlurView
+          intensity={Platform.OS === 'ios' ? 80 : 100}
           tint={th.id === 'midnight' || th.id === 'silk' || th.id === 'marble' ? 'dark' : 'light'}
           style={[styles.header, { paddingTop: insets.top + 8, paddingBottom: 12 }]}
         >
@@ -1003,7 +1003,7 @@ export default function ChatScreen() {
               <Ionicons name="videocam-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerActionBtn} onPress={() => setThemePickerVisible(true)}>
-               <Ionicons name="information-circle-outline" size={24} color="#FFFFFF" />
+              <Ionicons name="information-circle-outline" size={24} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
         </BlurView>
@@ -1194,8 +1194,8 @@ export default function ChatScreen() {
             {/* 3. Actions (Mic/Send) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingRight: 8, paddingBottom: 6 }}>
               {!inputText.trim() && !selectedImage && (
-                <TouchableOpacity 
-                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DB4B4B', justifyContent: 'center', alignItems: 'center' }} 
+                <TouchableOpacity
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#DB4B4B', justifyContent: 'center', alignItems: 'center' }}
                   onPress={startRecording}
                 >
                   <Ionicons name="mic" size={18} color="#FFF" />
@@ -1377,12 +1377,12 @@ const styles = StyleSheet.create({
   pinnedText: { fontSize: 13, fontWeight: '600', marginLeft: 8 },
 
   contextBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.3)' },
-  contextMenu: { 
-    position: 'absolute', 
-    width: 200, 
-    borderRadius: 20, 
-    padding: 6, 
-    backgroundColor: '#FFF', 
+  contextMenu: {
+    position: 'absolute',
+    width: 200,
+    borderRadius: 20,
+    padding: 6,
+    backgroundColor: '#FFF',
     ...Platform.select({
       ...shadow('#000', { height: 8, width: 0 }, 0.15, 16, 6),
       android: { elevation: 10 },
@@ -1396,20 +1396,20 @@ const styles = StyleSheet.create({
   contextButtonText: { fontSize: 15, fontWeight: '600' },
 
   systemBubbleWrap: { alignItems: 'center', marginVertical: 14 },
-  systemBubble: { 
-    paddingHorizontal: 14, 
-    paddingVertical: 6, 
-    borderRadius: 20, 
-    backgroundColor: 'rgba(30,30,30,0.6)', 
-    borderWidth: 1, 
-    borderColor: 'rgba(255,255,255,0.05)' 
+  systemBubble: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(30,30,30,0.6)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)'
   },
-  systemBubbleText: { 
-    fontSize: 10, 
-    fontWeight: '800', 
-    color: '#E0E0E0', 
-    textTransform: 'uppercase', 
-    letterSpacing: 1 
+  systemBubbleText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#E0E0E0',
+    textTransform: 'uppercase',
+    letterSpacing: 1
   },
 
   milestoneContainer: { alignItems: 'center', marginVertical: 20 },
